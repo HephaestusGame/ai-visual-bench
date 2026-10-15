@@ -32,6 +32,7 @@ Generate all geometry and textures procedurally. Use no external models or image
 | Grok 4.7 | 40 分钟 | [运行](https://hephaestusgame.github.io/ai-visual-bench/tests/steampunk-bee/grok-4.7/) · [源码](tests/steampunk-bee/grok-4.7/index.html) |
 | DeepSeek V41 Flash | 12 分钟 | [运行](https://hephaestusgame.github.io/ai-visual-bench/tests/steampunk-bee/v41-flash/) · [源码](tests/steampunk-bee/v41-flash/index.html) · [README](tests/steampunk-bee/v41-flash/README.txt) |
 | GPT 6 Astra | 18 分钟 | [运行](https://hephaestusgame.github.io/ai-visual-bench/tests/steampunk-bee/gpt-6-astra/) · [源码](tests/steampunk-bee/gpt-6-astra/index.html) |
+| GLM 5.3 | 15 分钟 | [运行](https://hephaestusgame.github.io/ai-visual-bench/tests/steampunk-bee/glm-5.3/) · [源码](tests/steampunk-bee/glm-5.3/index.html) |
 
 
 ## 目录结构 / Layout

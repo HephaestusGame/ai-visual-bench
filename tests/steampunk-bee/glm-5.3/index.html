@@ -1,0 +1,968 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Aether-Apiary Unit-07 — Steampunk Mechanical Bee (GLM-5.3)</title>
+<style>
+  html, body { margin:0; height:100%; overflow:hidden; background:#0b0e14;
+               font-family:Consolas,'Courier New',monospace; }
+  #app { position:fixed; inset:0; }
+  canvas { display:block; }
+  #hud { position:fixed; left:16px; top:14px; color:#9fb4c7; user-select:none;
+         pointer-events:none; z-index:10; }
+  #hud h1 { font-size:13px; letter-spacing:4px; margin:0; color:#d8b45a; font-weight:600; }
+  #hud p  { margin:4px 0 0; font-size:10px; letter-spacing:1.5px; opacity:.65; }
+  .lil-gui { --width:300px; --widget-height:26px; font-size:11px; }
+</style>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+<div id="hud">
+  <h1>AETHER-APIARY &middot; UNIT 07</h1>
+  <p>STEAMPUNK MECHANICAL BEE &mdash; DRAG TO ORBIT &middot; SCROLL TO ZOOM</p>
+</div>
+<div id="app"></div>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import GUI from 'three/addons/libs/lil-gui.module.min.js';
+
+/* ================================================================
+   0. PARAMETERS
+================================================================ */
+const params = {
+  explode:    0,       // 0..1 exploded view
+  freq:      18,       // wing flap frequency, Hz (0..60)
+  mode: 'Flight',      // 'Flight' | 'Idle'
+  gearSpeed:  1,       // gear train speed multiplier (0.1..5)
+  axis:  'Radial',     // 'Radial' | 'Axial' | 'Both'
+  wireframe: false
+};
+
+let simTime = 0;          // seconds (delta-time accumulated)
+let flapPhase = 0;        // wing phase, radians
+let gearAngle = 0;        // gear train phase, radians
+let explodeCur = 0;       // smoothed explode value
+let flightBlend = 1;      // 0 = idle, 1 = flight (smoothed)
+
+/* ================================================================
+   1. RENDERER / SCENE / CAMERA / LIGHTS
+================================================================ */
+const app = document.getElementById('app');
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.15;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+app.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0b0e14);
+scene.fog = new THREE.Fog(0x0b0e14, 9, 24);
+
+const camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.1, 100);
+camera.position.set(3.1, 2.6, 4.3);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 1.45, -0.5);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.minDistance = 2.2;
+controls.maxDistance = 12;
+controls.maxPolarAngle = 1.62;
+
+// studio image-based lighting for the PBR metals
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+pmrem.dispose();
+
+// key light (warm spot, casts soft shadows)
+const key = new THREE.SpotLight(0xffe3c0, 900, 0, 0.46, 0.6, 2);
+key.position.set(5.5, 7.5, 4.5);
+key.castShadow = true;
+key.shadow.mapSize.set(2048, 2048);
+key.shadow.bias = -0.0002;
+key.shadow.normalBias = 0.02;
+key.shadow.camera.near = 2;
+key.shadow.camera.far = 20;
+key.target.position.set(0, 1.2, -0.4);
+scene.add(key, key.target);
+
+// cool fill + warm rim + ambient hemisphere
+const fill = new THREE.DirectionalLight(0x8fb0ff, 0.55);
+fill.position.set(-4, 2.5, 3.5);
+scene.add(fill);
+const rim = new THREE.DirectionalLight(0xffd9a0, 1.5);
+rim.position.set(-3, 4, -6);
+scene.add(rim);
+scene.add(new THREE.HemisphereLight(0x2c3542, 0x0b0a09, 0.45));
+
+/* ================================================================
+   2. PROCEDURAL TEXTURES  (canvas only — no external assets)
+================================================================ */
+function mulberry32(seed) {
+  return function () {
+    seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+    let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+function makeCanvas(w, h) {
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  return [c, c.getContext('2d')];
+}
+const rgba = (c, a) => `rgba(${c[0] | 0},${c[1] | 0},${c[2] | 0},${a})`;
+
+// soft blotch + streak grunge used for every weathered metal
+function grungeCanvas(size, seed, base, blotches, streakCount) {
+  const [c, ctx] = makeCanvas(size, size);
+  const rnd = mulberry32(seed);
+  ctx.fillStyle = rgba(base, 1);
+  ctx.fillRect(0, 0, size, size);
+  for (const b of blotches) {
+    for (let i = 0; i < b.count; i++) {
+      const x = rnd() * size, y = rnd() * size;
+      const r = b.rMin + rnd() * (b.rMax - b.rMin);
+      const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+      g.addColorStop(0, rgba(b.color, b.a));
+      g.addColorStop(1, rgba(b.color, 0));
+      ctx.fillStyle = g;
+      ctx.fillRect(x - r, y - r, 2 * r, 2 * r);
+    }
+  }
+  for (let i = 0; i < streakCount; i++) {
+    const x = rnd() * size, y = rnd() * size;
+    const a = rnd() * Math.PI, len = 20 + rnd() * 120;
+    ctx.strokeStyle = rgba(rnd() < 0.5 ? [255, 255, 255] : [0, 0, 0], 0.03 + rnd() * 0.05);
+    ctx.lineWidth = 0.5 + rnd() * 1.5;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x + Math.cos(a) * len, y + Math.sin(a) * len);
+    ctx.stroke();
+  }
+  return c;
+}
+function canvasTexture(canvas, { srgb = false, repeat = null } = {}) {
+  const t = new THREE.CanvasTexture(canvas);
+  if (srgb) t.colorSpace = THREE.SRGBColorSpace;
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  if (repeat) t.repeat.set(repeat[0], repeat[1]);
+  t.anisotropy = 8;
+  return t;
+}
+
+// ---- brass ----
+const brassColorTex = canvasTexture(
+  grungeCanvas(512, 11, [199, 152, 63],
+    [{ color: [236, 200, 116], a: 0.10, count: 70, rMin: 10, rMax: 60 },
+     { color: [118, 80, 28],   a: 0.13, count: 80, rMin: 6,  rMax: 42 }], 150), { srgb: true });
+const brassMRTex = canvasTexture(
+  grungeCanvas(512, 11, [0, 92, 255],
+    [{ color: [0, 148, 255],  a: 0.45, count: 70, rMin: 10, rMax: 60 },
+     { color: [0, 70, 255],   a: 0.45, count: 80, rMin: 6,  rMax: 42 }], 150));
+
+// ---- oxidized copper (verdigris) ----
+const copperColorTex = canvasTexture(
+  grungeCanvas(512, 23, [172, 100, 55],
+    [{ color: [64, 138, 110], a: 0.30, count: 42, rMin: 12, rMax: 70 },
+     { color: [86, 44, 24],   a: 0.25, count: 60, rMin: 6,  rMax: 40 }], 90), { srgb: true });
+const copperMRTex = canvasTexture(
+  grungeCanvas(512, 23, [0, 112, 255],
+    [{ color: [0, 205, 120],  a: 0.85, count: 42, rMin: 12, rMax: 70 },
+     { color: [0, 150, 255],  a: 0.60, count: 60, rMin: 6,  rMax: 40 }], 90));
+
+// ---- blued steel ----
+const steelColorTex = canvasTexture(
+  grungeCanvas(512, 37, [74, 84, 108],
+    [{ color: [128, 148, 182], a: 0.12, count: 55, rMin: 8, rMax: 55 },
+     { color: [30, 34, 48],    a: 0.20, count: 55, rMin: 5, rMax: 35 }], 260), { srgb: true });
+const steelMRTex = canvasTexture(
+  grungeCanvas(512, 37, [0, 66, 255],
+    [{ color: [0, 50, 255],   a: 0.55, count: 55, rMin: 8, rMax: 55 },
+     { color: [0, 95, 255],   a: 0.55, count: 55, rMin: 5, rMax: 35 }], 260));
+
+// ---- dark iron (gear bodies) ----
+const ironColorTex = canvasTexture(
+  grungeCanvas(256, 53, [64, 63, 66],
+    [{ color: [96, 94, 98],  a: 0.15, count: 40, rMin: 6, rMax: 40 }], 120), { srgb: true });
+const ironMRTex = canvasTexture(
+  grungeCanvas(256, 53, [0, 130, 255],
+    [{ color: [0, 190, 255], a: 0.5, count: 40, rMin: 6, rMax: 40 }], 120));
+
+// ---- amber compound eye: hexagonal facets ----
+function eyeCanvas() {
+  const [c, ctx] = makeCanvas(256, 256);
+  const rnd = mulberry32(7);
+  ctx.fillStyle = '#4a2300';
+  ctx.fillRect(0, 0, 256, 256);
+  const s = 13;                                    // hex radius
+  for (let row = -1; row < 256 / s + 1; row++) {
+    for (let col = -1; col < 256 / (s * 1.73) + 1; col++) {
+      const cx = col * s * 1.732 + (row % 2 ? s * 0.866 : 0);
+      const cy = row * s * 1.5;
+      const l = 26 + rnd() * 26;                   // amber lightness variance
+      ctx.fillStyle = `hsl(35,92%,${l}%)`;
+      ctx.strokeStyle = 'rgba(255,214,140,0.35)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      for (let k = 0; k < 6; k++) {
+        const a = Math.PI / 6 + k * Math.PI / 3;
+        const x = cx + Math.cos(a) * s * 0.92, y = cy + Math.sin(a) * s * 0.92;
+        k ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+      }
+      ctx.closePath();
+      ctx.fill(); ctx.stroke();
+    }
+  }
+  return c;
+}
+const eyeTex = canvasTexture(eyeCanvas(), { srgb: true, repeat: [4, 3] });
+
+// ---- wing membrane with veins (map + bump share the pattern) ----
+function wingCanvas(bump) {
+  const [c, ctx] = makeCanvas(512, 256);
+  const rnd = mulberry32(99);
+  if (bump) { ctx.fillStyle = '#808080'; ctx.fillRect(0, 0, 512, 256); }
+  else      { ctx.fillStyle = '#f7f2e6'; ctx.fillRect(0, 0, 512, 256); }
+  ctx.lineCap = 'round';
+  const vein = (x1, y1, x2, y2, w) => {
+    ctx.strokeStyle = bump ? `rgba(255,255,255,0.9)` : `rgba(150,108,52,0.55)`;
+    ctx.lineWidth = w;
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+  };
+  vein(6, 128, 506, 118, 4);                                   // main vein
+  for (let i = 0; i < 14; i++) {                               // branching veins
+    const x = 30 + i * 34;
+    const splay = 0.35 + rnd() * 0.55;
+    vein(x, 126, x + 26 + rnd() * 14, 128 - 105 * splay, 2);   // up
+    vein(x + 8, 130, x + 34 + rnd() * 14, 128 + 100 * splay, 2); // down
+  }
+  vein(6, 20, 500, 30, 3);                                     // leading edge
+  vein(6, 232, 500, 215, 3);                                   // trailing edge
+  return c;
+}
+const wingTex = canvasTexture(wingCanvas(false), { srgb: true });
+const wingBumpTex = canvasTexture(wingCanvas(true));
+
+// ---- machined stage floor: concentric engraving ----
+function groundCanvas() {
+  const [c, ctx] = makeCanvas(1024, 1024);
+  ctx.fillStyle = '#15171d';
+  ctx.fillRect(0, 0, 1024, 1024);
+  ctx.strokeStyle = 'rgba(120,140,170,0.10)';
+  for (let r = 40; r < 720; r += 40) {
+    ctx.lineWidth = r % 120 === 0 ? 2 : 1;
+    ctx.beginPath(); ctx.arc(512, 512, r, 0, Math.PI * 2); ctx.stroke();
+  }
+  ctx.strokeStyle = 'rgba(120,140,170,0.05)';
+  for (let a = 0; a < 24; a++) {
+    ctx.beginPath();
+    ctx.moveTo(512 + Math.cos(a / 24 * Math.PI * 2) * 60, 512 + Math.sin(a / 24 * Math.PI * 2) * 60);
+    ctx.lineTo(512 + Math.cos(a / 24 * Math.PI * 2) * 700, 512 + Math.sin(a / 24 * Math.PI * 2) * 700);
+    ctx.stroke();
+  }
+  return c;
+}
+const groundTex = canvasTexture(groundCanvas(), { srgb: true });
+
+/* ================================================================
+   3. MATERIALS
+================================================================ */
+const pbrMats = [];   // everything that obeys the Wireframe toggle
+
+function track(m) { pbrMats.push(m); return m; }
+
+const matBrass = track(new THREE.MeshPhysicalMaterial({
+  map: brassColorTex, metalness: 1.0, roughness: 0.34,
+  roughnessMap: brassMRTex, bumpMap: brassMRTex, bumpScale: 0.35 }));
+const matCopper = track(new THREE.MeshPhysicalMaterial({
+  map: copperColorTex, metalness: 1.0, roughness: 0.42,
+  metalnessMap: copperMRTex, roughnessMap: copperMRTex,
+  bumpMap: copperMRTex, bumpScale: 0.4 }));
+const matSteel = track(new THREE.MeshPhysicalMaterial({
+  map: steelColorTex, metalness: 1.0, roughness: 0.26,
+  roughnessMap: steelMRTex, bumpMap: steelMRTex, bumpScale: 0.3 }));
+const matIron = track(new THREE.MeshPhysicalMaterial({
+  map: ironColorTex, metalness: 0.95, roughness: 0.5,
+  roughnessMap: ironMRTex, bumpMap: ironMRTex, bumpScale: 0.3 }));
+const matGold = track(new THREE.MeshPhysicalMaterial({
+  color: 0xf0c060, metalness: 1.0, roughness: 0.18 }));
+const matRubber = track(new THREE.MeshStandardMaterial({
+  color: 0x17140f, metalness: 0.0, roughness: 0.92 }));
+const matGlassAmber = track(new THREE.MeshPhysicalMaterial({
+  color: 0xffc766, metalness: 0, roughness: 0.05,
+  transmission: 0.96, thickness: 0.12, ior: 1.45,
+  clearcoat: 1.0, clearcoatRoughness: 0.1 }));
+const matEye = track(new THREE.MeshPhysicalMaterial({
+  map: eyeTex, color: 0xffffff, metalness: 0.1, roughness: 0.12,
+  transmission: 0.55, thickness: 0.4, ior: 1.5,
+  bumpMap: eyeTex, bumpScale: 0.6, clearcoat: 1.0 }));
+const matWing = track(new THREE.MeshPhysicalMaterial({
+  map: wingTex, metalness: 0.0, roughness: 0.16,
+  transmission: 0.9, thickness: 0.04, ior: 1.32,
+  iridescence: 1.0, iridescenceIOR: 1.35, iridescenceThicknessRange: [120, 480],
+  bumpMap: wingBumpTex, bumpScale: 0.25, side: THREE.DoubleSide, transparent: true }));
+const matCore = track(new THREE.MeshStandardMaterial({
+  color: 0x2a0d00, emissive: 0xff6a00, emissiveIntensity: 2.5, roughness: 0.4 }));
+const matGround = track(new THREE.MeshStandardMaterial({
+  map: groundTex, color: 0xffffff, metalness: 0.35, roughness: 0.55 }));
+
+// cyan leader lines for the exploded view
+const lineMat = new THREE.LineBasicMaterial({
+  color: 0x5ef2ff, transparent: true, opacity: 0,
+  blending: THREE.AdditiveBlending, depthWrite: false });
+const dotMat = new THREE.MeshBasicMaterial({
+  color: 0x9ffaff, transparent: true, opacity: 0,
+  blending: THREE.AdditiveBlending, depthWrite: false });
+
+/* ================================================================
+   4. GEOMETRY HELPERS
+================================================================ */
+// Deterministic gear: pitch radius R = N*p/(2π), chunky trapezoid teeth.
+function gearGeometry(N, p, th, { hole, spokes } = {}) {
+  const R = N * p / (2 * Math.PI);
+  const depth = p * 0.62;
+  const outer = R + depth / 2, root = R - depth / 2;
+  const step = 2 * Math.PI / N;
+  const tipFrac = 0.26, rootFrac = 0.54;
+  const shape = new THREE.Shape();
+  for (let i = 0; i < N; i++) {
+    const c = i * step;
+    const pts = [
+      [root, c - step * rootFrac / 2],
+      [outer, c - step * tipFrac / 2],
+      [outer, c + step * tipFrac / 2],
+      [root, c + step * rootFrac / 2],
+      [root, c + step / 2]
+    ];
+    for (let k = 0; k < pts.length; k++) {
+      const x = Math.cos(pts[k][1]) * pts[k][0];
+      const y = Math.sin(pts[k][1]) * pts[k][0];
+      (i === 0 && k === 0) ? shape.moveTo(x, y) : shape.lineTo(x, y);
+    }
+  }
+  const holeR = hole !== undefined ? hole : Math.max(0.022, root * 0.17);
+  const hub = new THREE.Path();
+  hub.absarc(0, 0, holeR, 0, Math.PI * 2, true);
+  shape.holes.push(hub);
+  const nSpokes = spokes !== undefined ? spokes : (N >= 12 ? 5 : 0);
+  if (nSpokes > 0) {
+    const midR = (holeR + root) / 2;
+    const spokeR = Math.min((root - holeR) * 0.30, Math.PI * midR / nSpokes * 0.34);
+    for (let i = 0; i < nSpokes; i++) {
+      const a = i / nSpokes * Math.PI * 2 + Math.PI / nSpokes;
+      const h = new THREE.Path();
+      h.absarc(Math.cos(a) * midR, Math.sin(a) * midR, spokeR, 0, Math.PI * 2, true);
+      shape.holes.push(h);
+    }
+  }
+  const geo = new THREE.ExtrudeGeometry(shape, {
+    depth: th, bevelEnabled: true, bevelThickness: th * 0.14,
+    bevelSize: p * 0.05, bevelSegments: 1, curveSegments: 4 });
+  geo.translate(0, 0, -th / 2);
+  return { geo, R };
+}
+
+// gear with hub + hex nut; returns a Group rotated flat (teeth in XZ plane)
+function makeGear(N, p, th, mat) {
+  const { geo } = gearGeometry(N, p, th);
+  const g = new THREE.Group();
+  const wheel = new THREE.Mesh(geo, mat);
+  g.add(wheel);
+  const holeR = Math.max(0.022, (N * p / (2 * Math.PI) - p * 0.31) * 0.17);
+  const hub = new THREE.Mesh(new THREE.CylinderGeometry(holeR * 1.9, holeR * 1.9, th * 2.4, 12), matGold);
+  g.add(hub);
+  const nut = new THREE.Mesh(new THREE.CylinderGeometry(holeR * 1.05, holeR * 1.05, th * 3.4, 6), matSteel);
+  g.add(nut);
+  g.rotation.x = -Math.PI / 2;   // lie flat on the thorax, spin around local Z
+  return g;
+}
+
+// initial rotation of a driven gear so teeth interlock with the driver
+function meshRot(rotPrev, Nprev, Nnext, phi) {
+  const sA = 2 * Math.PI / Nprev, sB = 2 * Math.PI / Nnext;
+  const alpha = (((phi - rotPrev) % sA) + sA) % sA / sA;   // driver tooth phase at mesh line
+  const v = phi + Math.PI - (alpha + 0.5) * sB;
+  return ((v % sB) + sB) % sB;
+}
+
+// tapering helix (antenna springs, spiral stinger)
+class HelixCurve extends THREE.Curve {
+  constructor(r0, r1, h, turns) { super(); this.r0 = r0; this.r1 = r1; this.h = h; this.turns = turns; }
+  getPoint(u, target = new THREE.Vector3()) {
+    const a = this.turns * Math.PI * 2 * u;
+    const r = this.r0 + (this.r1 - this.r0) * u;
+    return target.set(Math.cos(a) * r, this.h * u, Math.sin(a) * r);
+  }
+}
+
+const rivetGeo = new THREE.SphereGeometry(0.016, 8, 8);
+function addRivetRing(parent, rx, rz, y, count, mat) {
+  for (let i = 0; i < count; i++) {
+    const a = i / count * Math.PI * 2;
+    const r = new THREE.Mesh(rivetGeo, mat);
+    r.position.set(Math.cos(a) * rx, y, Math.sin(a) * rz);
+    r.scale.set(1, 0.7, 1);
+    parent.add(r);
+  }
+}
+
+const cylinder = (rt, rb, h, seg = 12) => new THREE.CylinderGeometry(rt, rb, h, seg);
+const M = (geo, mat) => new THREE.Mesh(geo, mat);
+
+/* ================================================================
+   5. THE BEE
+================================================================ */
+const bee = new THREE.Group();
+bee.position.y = 1.5;
+scene.add(bee);
+
+/* ---------------- 5a. HEAD (articulated) ---------------- */
+const head = new THREE.Group();
+head.position.set(0, 0.10, 0.72);
+bee.add(head);
+
+{
+  const shell = M(new THREE.SphereGeometry(0.34, 32, 24), matBrass);
+  shell.scale.set(1.02, 0.98, 1.08);
+  head.add(shell);
+
+  const face = M(new THREE.SphereGeometry(0.30, 24, 18), matSteel);
+  face.scale.set(0.92, 0.82, 0.55);
+  face.position.set(0, -0.01, 0.16);
+  head.add(face);
+
+  // forehead pressure valve
+  const valve = M(cylinder(0.028, 0.034, 0.06, 10), matCopper);
+  valve.position.set(0, 0.315, 0.02);
+  head.add(valve);
+  const valveCap = M(new THREE.SphereGeometry(0.03, 12, 8), matGold);
+  valveCap.position.set(0, 0.35, 0.02);
+  head.add(valveCap);
+
+  addRivetRing(head, 0.35, 0.375, -0.02, 10, matGold);
+}
+
+// amber compound eyes with copper rims
+const eyes = [];
+for (const s of [-1, 1]) {
+  const eye = new THREE.Group();
+  eye.position.set(s * 0.225, 0.05, 0.10);
+  eye.rotation.y = s * 0.55;
+  const ball = M(new THREE.SphereGeometry(0.155, 24, 18), matEye);
+  ball.scale.set(1, 1.28, 0.82);
+  eye.add(ball);
+  const ring = M(new THREE.TorusGeometry(0.155, 0.014, 10, 28), matCopper);
+  ring.scale.set(1, 1.28, 1);
+  eye.add(ring);
+  head.add(eye);
+  eyes.push(eye);
+}
+
+// spring antennae
+const antennaRoots = [];
+for (const s of [-1, 1]) {
+  const root = new THREE.Group();
+  root.position.set(s * 0.15, 0.31, 0.06);
+  root.rotation.set(-0.45, 0, s * 0.55);
+  head.add(root);
+  root.add(M(new THREE.SphereGeometry(0.030, 10, 8), matGold));          // socket ball
+  const spring = M(new THREE.TubeGeometry(
+    new HelixCurve(0.036, 0.009, 0.36, 5), 160, 0.0065, 6), matBrass);
+  root.add(spring);
+  const tip = M(new THREE.SphereGeometry(0.020, 10, 8), matCopper);
+  tip.position.y = 0.37;
+  root.add(tip);
+  antennaRoots.push({ root, side: s });
+}
+
+// mandibles
+const mandibles = [];
+for (const s of [-1, 1]) {
+  const m = new THREE.Group();
+  m.position.set(s * 0.10, -0.17, 0.26);
+  head.add(m);
+  m.add(M(new THREE.SphereGeometry(0.026, 10, 8), matSteel));
+  const jaw = M(new THREE.ConeGeometry(0.030, 0.15, 10), matGold);
+  jaw.position.set(s * 0.02, -0.045, 0.045);
+  jaw.rotation.set(1.15, 0, -s * 0.25);
+  m.add(jaw);
+  mandibles.push({ group: m, side: s });
+}
+
+/* ---------------- 5b. THORAX + CLOCKWORK ---------------- */
+const thorax = new THREE.Group();
+bee.add(thorax);
+
+{
+  const shell = M(new THREE.SphereGeometry(0.52, 36, 28), matBrass);
+  shell.scale.set(0.86, 0.78, 1.02);
+  thorax.add(shell);
+  const breast = M(new THREE.SphereGeometry(0.42, 28, 20), matCopper);
+  breast.scale.set(0.78, 0.60, 0.78);
+  breast.position.set(0, -0.10, 0.26);
+  thorax.add(breast);
+  addRivetRing(thorax, 0.44, 0.515, 0.06, 14, matGold);
+}
+
+// glass canopy over the clockwork
+const canopy = new THREE.Group();
+canopy.position.set(0, 0.40, 0.15);
+thorax.add(canopy);
+{
+  const dome = M(new THREE.SphereGeometry(0.56, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2), matGlassAmber);
+  dome.scale.set(1, 0.72, 1);
+  canopy.add(dome);
+  const rimRing = M(new THREE.TorusGeometry(0.56, 0.022, 10, 48), matBrass);
+  rimRing.rotation.x = Math.PI / 2;
+  canopy.add(rimRing);
+  const spine = M(cylinder(0.014, 0.014, 0.84, 8), matGold);
+  spine.rotation.z = Math.PI / 2;
+  spine.position.y = 0.02;
+  canopy.add(spine);
+}
+
+// ---- synchronized gear train (common tooth pitch p) ----
+const PITCH = 0.075, GEAR_TH = 0.05;
+const gearDefs = [
+  // N,  ratioToDriver, pos, material
+  { N: 18, ratio: 1.0,    pos: [0, 0.470, 0.10],  mat: matBrass  },  // driver
+  { N: 9,  ratio: -2.0,   pos: [0, 0.470, 0.423], mat: matIron   },
+  { N: 12, ratio: 1.5,    pos: [-0.25, 0.470, 0.423], mat: matBrass },
+  { N: 8,  ratio: -2.25,  pos: [0, 0.470, -0.211], mat: matIron  },
+  { N: 13, ratio: -18 / 13, pos: [0.371, 0.470, 0.10], mat: matBrass }
+];
+const gears = [];
+{
+  // solve tooth phases so every wheel interlocks with its driver
+  const r = [0, 0, 0, 0, 0];
+  r[0] = Math.PI / 18;
+  r[1] = meshRot(r[0], 18, 9,  Math.PI / 2);   // B ahead of A (+z)
+  r[2] = meshRot(r[1], 9, 12,  Math.PI);       // C beside B  (-x)
+  r[3] = meshRot(r[0], 18, 8, -Math.PI / 2);   // D behind A  (-z)
+  r[4] = meshRot(r[0], 18, 13, 0);             // E beside A  (+x)
+
+  gearDefs.forEach((d, i) => {
+    const g = makeGear(d.N, PITCH, GEAR_TH, d.mat);
+    g.position.set(...d.pos);
+    thorax.add(g);
+    const axle = M(cylinder(0.016, 0.016, 0.14, 8), matSteel);
+    axle.position.set(d.pos[0], d.pos[1] - 0.05, d.pos[2]);
+    thorax.add(axle);
+    gears.push({ group: g, ratio: d.ratio, phase0: r[i] });
+  });
+}
+
+// steam pistons beating with the wings
+const pistons = [];
+for (const s of [-1, 1]) {
+  const block = M(cylinder(0.038, 0.044, 0.10, 12), matCopper);
+  block.position.set(s * 0.38, 0.22, 0.30);
+  thorax.add(block);
+  const rod = M(cylinder(0.012, 0.012, 0.14, 8), matSteel);
+  rod.position.set(s * 0.38, 0.31, 0.30);
+  thorax.add(rod);
+  pistons.push({ rod, baseY: 0.31 });
+}
+// rear exhaust stacks
+for (const s of [-1, 1]) {
+  const stack = M(cylinder(0.024, 0.030, 0.13, 10), matCopper);
+  stack.position.set(s * 0.22, 0.16, -0.42);
+  stack.rotation.set(0.25, 0, -s * 0.3);
+  thorax.add(stack);
+}
+
+/* ---------------- 5c. WINGS (4 rigs, iridescent) ---------------- */
+function wingShapeGeo(len, wide) {
+  const s = new THREE.Shape();
+  s.moveTo(0, 0);
+  s.lineTo(0.22 * len, 0.30 * wide);
+  s.bezierCurveTo(0.62 * len, 0.34 * wide, 0.9 * len, 0.16 * wide, len, -0.02 * wide);
+  s.bezierCurveTo(0.94 * len, -0.34 * wide, 0.5 * len, -0.46 * wide, 0.18 * len, -0.30 * wide);
+  s.lineTo(0, 0);
+  return new THREE.ShapeGeometry(s, 12);
+}
+// ShapeGeometry UVs equal raw coords — normalize into 0..1
+function normalizeUVs(geo) {
+  geo.computeBoundingBox();
+  const bb = geo.boundingBox;
+  const sx = bb.max.x - bb.min.x, sy = bb.max.y - bb.min.y;
+  const uv = geo.attributes.uv, pos = geo.attributes.position;
+  for (let i = 0; i < uv.count; i++) {
+    uv.setXY(i, (pos.getX(i) - bb.min.x) / sx, (pos.getY(i) - bb.min.y) / sy);
+  }
+  uv.needsUpdate = true;
+}
+const foreWingGeo = wingShapeGeo(1.55, 1.0);
+const hindWingGeo = wingShapeGeo(1.02, 0.9);
+normalizeUVs(foreWingGeo);
+normalizeUVs(hindWingGeo);
+
+function buildWingRig(anchor, geo, isLeft) {
+  const root = new THREE.Group();
+  root.position.copy(anchor);
+  if (isLeft) root.rotation.y = Math.PI;          // mirror the whole rig
+  thorax.add(root);
+
+  const sweep = new THREE.Group(); root.add(sweep);
+  const flap = new THREE.Group(); sweep.add(flap);
+  const twist = new THREE.Group(); flap.add(twist);
+
+  const hinge = M(new THREE.SphereGeometry(0.062, 12, 10), matSteel);
+  flap.add(hinge);
+  const spar = M(cylinder(0.014, 0.008, 0.42, 8), matBrass);
+  spar.rotation.z = -Math.PI / 2;
+  spar.position.x = 0.21;
+  flap.add(spar);
+
+  const membrane = M(geo, matWing);
+  membrane.rotation.x = Math.PI / 2;              // lie flat, leading edge +Z
+  twist.add(membrane);
+  return { root, sweep, flap, twist, isLeft };
+}
+const wingRigs = [
+  buildWingRig(new THREE.Vector3( 0.42, 0.20, -0.02), foreWingGeo, false),
+  buildWingRig(new THREE.Vector3(-0.42, 0.20, -0.02), foreWingGeo, true),
+  buildWingRig(new THREE.Vector3( 0.385, 0.14, -0.40), hindWingGeo, false),
+  buildWingRig(new THREE.Vector3(-0.385, 0.14, -0.40), hindWingGeo, true)
+];
+const isHind = (i) => i >= 2;
+
+// exposed shoulder gears spinning with the flap
+const shoulderGears = [];
+for (const s of [-1, 1]) {
+  for (const [zi, z] of [[0, -0.02], [1, -0.40]].entries()) {
+    const g = makeGear(8, PITCH, 0.035, matIron);
+    g.position.set(s * 0.46, 0.06, z);
+    g.rotation.set(0, 0, 0);                      // vertical plane, drives flap axis
+    thorax.add(g);
+    shoulderGears.push({ group: g, hind: zi === 1, side: s });
+  }
+}
+
+/* ---------------- 5d. LEGS (six, segmented) ---------------- */
+function buildLeg(anchorZ, isLeft) {
+  const root = new THREE.Group();
+  root.position.set(isLeft ? -0.38 : 0.38, -0.20, anchorZ);
+  if (isLeft) root.rotation.y = Math.PI;
+  thorax.add(root);
+
+  root.add(M(new THREE.SphereGeometry(0.082, 12, 10), matCopper));   // coxa
+
+  const femur = new THREE.Group(); root.add(femur);
+  const femurMesh = M(cylinder(0.050, 0.038, 0.34, 10), matSteel);
+  femurMesh.position.y = -0.17;
+  femur.add(femurMesh);
+  const kneeRing = M(new THREE.TorusGeometry(0.050, 0.014, 8, 16), matBrass);
+  kneeRing.rotation.x = Math.PI / 2;
+  kneeRing.position.y = -0.34;
+  femur.add(kneeRing);
+
+  const tibia = new THREE.Group(); tibia.position.y = -0.34; femur.add(tibia);
+  const tibiaMesh = M(cylinder(0.030, 0.019, 0.36, 8), matSteel);
+  tibiaMesh.position.y = -0.18;
+  tibia.add(tibiaMesh);
+  const spur = M(new THREE.ConeGeometry(0.014, 0.07, 8), matGold);
+  spur.position.set(0.02, -0.05, 0.04);
+  spur.rotation.x = 0.7;
+  tibia.add(spur);
+
+  const tarsus = new THREE.Group(); tarsus.position.y = -0.36; tibia.add(tarsus);
+  const tarsusMesh = M(cylinder(0.014, 0.010, 0.22, 8), matBrass);
+  tarsusMesh.position.y = -0.11;
+  tarsus.add(tarsusMesh);
+  for (const c of [-1, 1]) {
+    const claw = M(new THREE.ConeGeometry(0.011, 0.055, 8), matGold);
+    claw.position.set(c * 0.012, -0.245, 0.008);
+    claw.rotation.set(-0.35, 0, c * 0.35);
+    tarsus.add(claw);
+  }
+  return { root, femur, tibia, tarsus };
+}
+// poses: [fore, mid, hind] — tucked in flight, hanging at idle
+const legFlight = [
+  { fz: -1.05, fx:  0.55, tz:  1.45, tx: 0.35, rs: -0.35 },
+  { fz: -0.95, fx:  0.10, tz:  1.30, tx: 0.20, rs: -0.15 },
+  { fz: -1.10, fx: -0.35, tz:  1.20, tx: 0.10, rs:  0.10 }
+];
+const legIdle = [
+  { fz: -0.42, fx:  0.30, tz:  0.55, tx: 0.30, rs: -0.30 },
+  { fz: -0.35, fx:  0.00, tz:  0.45, tx: 0.20, rs: -0.10 },
+  { fz: -0.38, fx: -0.30, tz:  0.40, tx: 0.15, rs:  0.15 }
+];
+const legs = [];
+for (const [i, z] of [0.30, 0.0, -0.30].entries()) {
+  for (const side of [false, true]) {
+    legs.push({ rig: buildLeg(z, side), pose: i });
+  }
+}
+
+/* ---------------- 5e. ABDOMEN (5 segments, core, stinger) ---- */
+const abdomen = new THREE.Group();
+bee.add(abdomen);
+
+// petiole (waist)
+const petiole = M(cylinder(0.085, 0.095, 0.44, 12), matBrass);
+petiole.rotation.x = Math.PI / 2;
+petiole.position.set(0, 0.02, -0.74);
+abdomen.add(petiole);
+
+const segZ   = [-1.02, -1.38, -1.74, -2.10, -2.46];
+const segR   = [0.42, 0.375, 0.32, 0.26, 0.195];
+const abdSegments = [];
+for (let i = 0; i < 5; i++) {
+  const seg = new THREE.Group();
+  seg.position.set(0, 0.02, segZ[i]);
+  abdomen.add(seg);
+  const shellGeo = new THREE.SphereGeometry(segR[i], 28, 20);
+  const shell = M(shellGeo, i === 2 ? matGlassAmber : (i % 2 ? matCopper : matBrass));
+  shell.scale.set(1, 1, 1.18);
+  seg.add(shell);
+  const band = M(new THREE.TorusGeometry(segR[i] * 0.90, 0.022, 8, 32), matRubber);
+  band.rotation.x = Math.PI / 2;
+  band.position.z = segR[i] * 0.62;
+  seg.add(band);
+  if (i !== 2) addRivetRing(seg, segR[i] * 0.99, segR[i] * 1.17, 0, 10, matGold);
+  abdSegments.push(seg);
+}
+
+// glowing power core (gyroscope)
+const core = new THREE.Group();
+core.position.set(0, 0.02, -1.68);
+abdomen.add(core);
+const coreBall = M(new THREE.IcosahedronGeometry(0.13, 1), matCore);
+core.add(coreBall);
+const gyro1 = M(new THREE.TorusGeometry(0.185, 0.012, 8, 32), matBrass);
+const gyro2 = M(new THREE.TorusGeometry(0.225, 0.010, 8, 32), matGold);
+gyro2.rotation.x = Math.PI / 2;
+core.add(gyro1, gyro2);
+const coreLight = new THREE.PointLight(0xff7a22, 3, 5, 2);
+core.add(coreLight);
+
+// spiral stinger (drill)
+const stinger = new THREE.Group();
+stinger.position.set(0, 0.02, -2.62);
+abdomen.add(stinger);
+{
+  const spike = M(new THREE.ConeGeometry(0.075, 0.40, 16), matSteel);
+  spike.rotation.x = -Math.PI / 2;                 // apex -> -Z, base at z=0
+  spike.position.z = -0.20;                        // spans 0 .. -0.40
+  stinger.add(spike);
+  const spiral = M(new THREE.TubeGeometry(new HelixCurve(0.072, 0.008, 0.40, 5), 200, 0.011, 6), matBrass);
+  spiral.rotation.x = -Math.PI / 2;                // helix +Y becomes -Z
+  spiral.position.z = 0;                           // wraps the cone surface
+  stinger.add(spiral);
+  const needle = M(new THREE.ConeGeometry(0.014, 0.12, 8), matGold);
+  needle.rotation.x = -Math.PI / 2;
+  needle.position.z = -0.45;
+  stinger.add(needle);
+  const collar = M(new THREE.TorusGeometry(0.072, 0.018, 8, 24), matCopper);
+  collar.position.z = -0.02;
+  stinger.add(collar);
+}
+
+bee.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+pbrMats.forEach(m => { m.envMapIntensity = 0.65; });
+matGlassAmber.envMapIntensity = 0.3;   // keep the canopy glare low, gears readable
+matWing.envMapIntensity = 1.15;        // translucent wings live on environment light
+
+/* ---------------- 5f. STAGE ---------------- */
+const ground = M(new THREE.CircleGeometry(7, 64), matGround);
+ground.rotation.x = -Math.PI / 2;
+ground.receiveShadow = true;
+scene.add(ground);
+const stageRing = M(new THREE.TorusGeometry(2.7, 0.016, 8, 100), matBrass);
+stageRing.rotation.x = Math.PI / 2;
+stageRing.position.y = 0.005;
+scene.add(stageRing);
+
+/* ================================================================
+   6. EXPLODED VIEW SYSTEM
+================================================================ */
+const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
+const explodeParts = [];
+const dotGeo = new THREE.SphereGeometry(0.014, 8, 6);
+
+function registerExplode(object, axial, radial, lineParent = object.parent) {
+  const base = object.position.clone();
+  const lineGeo = new THREE.BufferGeometry().setFromPoints([base, base]);
+  const line = new THREE.Line(lineGeo, lineMat);
+  line.visible = false;
+  line.frustumCulled = false;
+  lineParent.add(line);
+  const dot = new THREE.Mesh(dotGeo, dotMat);
+  dot.visible = false;
+  lineParent.add(dot);
+  explodeParts.push({ object, base, axial, radial, line, dot });
+}
+
+registerExplode(head,        V3(0, 0, 1.15),  V3(0, 0.15, 0));
+eyes.forEach(e => registerExplode(e, V3(0, 0, 0.45), V3(Math.sign(e.position.x) * 0.55, 0.12, 0.30)));
+antennaRoots.forEach(a => registerExplode(a.root, V3(0, 0.25, 0.45), V3(a.side * 0.35, 0.6, 0.1)));
+mandibles.forEach(m => registerExplode(m.group, V3(0, 0, 0.5), V3(m.side * 0.22, -0.38, 0.35)));
+registerExplode(canopy,      V3(0, 0.35, 0),   V3(0, 0.95, 0));
+gears.forEach((g, i) => registerExplode(g.group, V3(0, 0.3, 0), V3(0, 0.7 + i * 0.12, 0)));
+shoulderGears.forEach(g => registerExplode(g.group, V3(0, 0.55, 0), V3(g.side * 0.45, 0.35, g.hind ? -0.2 : 0.1)));
+pistons.forEach((p, i) => registerExplode(p.rod, V3(0, 0.3, 0), V3((i ? -1 : 1) * 0.55, 0.45, 0.15)));
+wingRigs.forEach((w, i) => registerExplode(
+  w.root, V3(0, 0.4, -0.1), V3((w.isLeft ? -1 : 1) * 0.95, 0.4, isHind(i) ? -0.25 : -0.05)));
+legs.forEach(l => registerExplode(
+  l.rig.root, V3(0, -0.15, 0), V3((l.rig.root.rotation.y ? -1 : 1) * 0.55, -0.5, 0)));
+registerExplode(petiole,     V3(0, 0, -0.18),  V3(0, 0.1, 0));
+abdSegments.forEach((s, i) => registerExplode(s, V3(0, 0, -(0.30 + i * 0.33)), V3(0, 0.26, 0)));
+registerExplode(core,        V3(0, 0, -0.6),   V3(0, 1.15, 0));
+registerExplode(stinger,     V3(0, 0, -1.6),   V3(0, 0.28, 0));
+
+const _dir = new THREE.Vector3();
+function updateExplode() {
+  const t = explodeCur;
+  const eased = t * t * (3 - 2 * t);
+  const show = t > 0.02;
+  lineMat.opacity = 0.85 * t;
+  dotMat.opacity = 0.9 * t;
+  for (const p of explodeParts) {
+    if (params.axis === 'Axial') _dir.copy(p.axial);
+    else if (params.axis === 'Radial') _dir.copy(p.radial);
+    else _dir.copy(p.axial).add(p.radial);
+    p.object.position.copy(p.base).addScaledVector(_dir, eased);
+    const posAttr = p.line.geometry.attributes.position;
+    posAttr.setXYZ(1, p.object.position.x, p.object.position.y, p.object.position.z);
+    posAttr.needsUpdate = true;
+    p.dot.position.copy(p.object.position);
+    p.line.visible = show;
+    p.dot.visible = show;
+  }
+}
+
+/* ================================================================
+   7. GUI
+================================================================ */
+const gui = new GUI({ title: '⚙ Mechanical Bee — GLM-5.3' });
+gui.add(params, 'explode', 0, 1, 0.001).name('Exploded View');
+gui.add(params, 'freq', 0, 60, 0.5).name('Flap Frequency (Hz)');
+gui.add(params, 'mode', ['Flight', 'Idle']).name('Mode');
+gui.add(params, 'gearSpeed', 0.1, 5, 0.05).name('Gear Speed (×)');
+gui.add(params, 'axis', ['Radial', 'Axial', 'Both']).name('Explode Axis');
+gui.add(params, 'wireframe').name('Wireframe').onChange(v => {
+  pbrMats.forEach(m => { m.wireframe = v; });
+});
+
+/* ================================================================
+   8. ANIMATION LOOP
+================================================================ */
+const clock = new THREE.Clock();
+const lerp = THREE.MathUtils.lerp;
+
+function animate() {
+  const dt = Math.min(clock.getDelta(), 0.05);
+  simTime += dt;
+
+  // smoothed control states
+  flightBlend += ((params.mode === 'Flight' ? 1 : 0) - flightBlend) * Math.min(1, dt * 3);
+  explodeCur += (params.explode - explodeCur) * Math.min(1, dt * 5);
+  const idle = 1 - flightBlend;
+
+  // ---- wing flapping (0–60 Hz) ----
+  flapPhase += dt * params.freq * Math.PI * 2 * flightBlend;
+  wingRigs.forEach((w, i) => {
+    const hind = isHind(i);
+    const phase = flapPhase - (hind ? 0.45 : 0);
+    const amp = (hind ? 0.68 : 0.82) * flightBlend;
+    const foldZ = -0.28 * idle - 0.05;
+    const sweepR = lerp(hind ? 1.45 : 1.25, hind ? -0.02 : -0.14, flightBlend);
+    w.sweep.rotation.y = sweepR;
+    w.flap.rotation.z = Math.sin(phase) * amp + foldZ;
+    w.twist.rotation.x = Math.cos(phase - 0.9) * 0.30 * flightBlend;
+  });
+  shoulderGears.forEach(g => {
+    g.group.rotation.z = flapPhase - (g.hind ? 0.45 : 0) + Math.PI / 8;
+  });
+
+  // ---- gear train ----
+  gearAngle += dt * params.gearSpeed * (1.0 + (params.freq / 60) * 3.5 * flightBlend);
+  gears.forEach(g => { g.group.rotation.z = g.phase0 + g.ratio * gearAngle; });
+
+  // ---- pistons beat with the flap ----
+  pistons.forEach((p, i) => {
+    p.rod.position.y = p.baseY + Math.sin(flapPhase + i * Math.PI) * 0.028 - 0.008;
+  });
+
+  // ---- body motion ----
+  const bob = Math.sin(simTime * 2.1) * 0.05 * flightBlend + Math.sin(simTime * 1.1) * 0.015 * idle;
+  bee.position.y = 1.5 + bob * (1 - explodeCur * 0.5);
+  bee.rotation.z = Math.sin(simTime * 1.7) * 0.03 * flightBlend;
+  bee.rotation.x = Math.sin(simTime * 1.3 + 1) * 0.025 * flightBlend;
+  bee.rotation.y = Math.sin(simTime * 0.4) * 0.07 * idle;
+
+  // articulated head: looks around when idle, vibrates in flight
+  head.rotation.y = Math.sin(simTime * 0.55) * 0.28 * idle
+                  + Math.sin(simTime * 9.3) * 0.012 * flightBlend;
+  head.rotation.x = Math.sin(simTime * 0.9 + 2) * 0.05 * idle;
+
+  // antennae: lazy sway idle, fast tremor in flight
+  antennaRoots.forEach((a, i) => {
+    a.root.rotation.x = -0.45 + Math.sin(simTime * 2.6 + i) * 0.16 * idle
+                      + Math.sin(simTime * 12 + i * 2) * 0.06 * flightBlend;
+    a.root.rotation.z = a.side * (0.55 + Math.sin(simTime * 2.2 + i) * 0.10);
+  });
+
+  // mandibles occasionally clamp at idle
+  mandibles.forEach(m => {
+    m.group.rotation.x = 0.05 + Math.pow(Math.max(0, Math.sin(simTime * 0.53 + m.side)), 14) * 0.35 * idle;
+  });
+
+  // ---- legs ----
+  legs.forEach(l => {
+    const f = legFlight[l.pose], d = legIdle[l.pose];
+    l.rig.femur.rotation.z = lerp(d.fz, f.fz, flightBlend);
+    l.rig.femur.rotation.x = lerp(d.fx, f.fx, flightBlend)
+      + Math.sin(simTime * 3 + l.pose) * 0.03 * idle;
+    l.rig.tibia.rotation.z = lerp(d.tz, f.tz, flightBlend);
+    l.rig.tibia.rotation.x = lerp(d.tx, f.tx, flightBlend);
+    l.rig.tarsus.rotation.z = lerp(d.rs, f.rs, flightBlend);
+  });
+
+  // ---- abdomen: breathing + power core ----
+  const breathe = 1 + Math.sin(simTime * 2.4) * 0.02 * idle;
+  abdomen.scale.set(1, breathe, 1);
+  const pulse = 0.75 + 0.25 * Math.sin(simTime * (3.2 + 2.5 * flightBlend));
+  matCore.emissiveIntensity = 1.6 + 1.6 * pulse;
+  coreLight.intensity = 1.5 + 3.5 * pulse;
+  gyro1.rotation.x += dt * 1.6 * params.gearSpeed;
+  gyro1.rotation.y += dt * 0.7 * params.gearSpeed;
+  gyro2.rotation.z += dt * 1.1 * params.gearSpeed;
+  stinger.rotation.z += dt * 4 * params.gearSpeed * flightBlend;   // drill spin
+
+  updateExplode();
+  controls.update();
+  renderer.render(scene, camera);
+}
+renderer.setAnimationLoop(animate);
+
+/* ================================================================
+   9. RESIZE
+================================================================ */
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+</script>
+</body>
+</html>
