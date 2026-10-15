@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101716">
+  <meta name="description" content="An interactive, entirely procedural clockwork bee with articulated flight and an exploded assembly view.">
+  <title>APIS / 01 — Clockwork Conservatory</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Cpath fill='%23d8ad64' d='M20 3 35 12v16L20 37 5 28V12zm0 6L10 15v10l10 6 10-6V15z'/%3E%3C/svg%3E">
+  <style>
+    :root { color-scheme: dark; --gold: #d8b57a; --muted: #8e9a94; --line: #ffffff19; }
+    * { box-sizing: border-box; }
+    body { margin: 0; overflow: hidden; background: #101716; color: #e8e8dc; font-family: Arial, sans-serif; }
+    canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+    #viewport { position: fixed; inset: 0; }
+    .vignette { position: fixed; inset: 0; pointer-events: none; box-shadow: inset 0 0 160px #050b0b70; }
+    header { position: absolute; top: 34px; left: 40px; pointer-events: none; }
+    .eyebrow, .edition, footer, .readout, .loading { font-family: "Courier New", monospace; }
+    .eyebrow { color: var(--gold); font-size: 10px; letter-spacing: 3px; display: flex; align-items: center; gap: 12px; }
+    .emblem { width: 25px; height: 28px; display: grid; place-items: center; border: 1px solid #d8b57a70; font-size: 15px; }
+    h1 { font-family: Georgia, serif; font-size: clamp(38px, 5vw, 66px); font-weight: 400; letter-spacing: -3px; margin: 22px 0 7px; }
+    h1 span { color: var(--gold); font-size: .51em; letter-spacing: -1px; }
+    .subtitle { color: #a1aaa2; font-size: 12px; letter-spacing: .5px; margin: 0; }
+    .edition { color: #89958c; margin-top: 22px; font-size: 9px; letter-spacing: 2px; }
+    #gui { position: absolute; top: 35px; right: 32px; width: 254px; }
+    .lil-gui { --background-color: #15201de8; --text-color: #d6ded5; --title-background-color: #202e27;
+      --title-text-color: #d8b57a; --widget-color: #314138; --hover-color: #3e5245;
+      --focus-color: #526449; --number-color: #e2be7f; --string-color: #a9d0c4;
+      --font-size: 11px; --input-font-size: 11px; --padding: 9px; --spacing: 8px;
+      --slider-knob-width: 3px; --slider-input-width: 45px; --widget-height: 23px;
+      border: 1px solid #829c7528; backdrop-filter: blur(18px); border-radius: 4px; }
+    .lil-gui .title { letter-spacing: 1.4px; font-size: 10px; }
+    .lil-gui .controller { padding: 0 4px; }
+    .readout { position: absolute; left: 40px; bottom: 96px; border-left: 1px solid #d8b57a60; padding: 0 0 0 14px; }
+    .readout small { color: var(--muted); font-size: 9px; letter-spacing: 2px; }
+    .readout strong { display: block; color: var(--gold); font-size: 20px; font-weight: 400; margin: 8px 0; }
+    .readout p { margin: 0; font-size: 9px; color: #96a597; letter-spacing: 1px; }
+    footer { position: absolute; bottom: 24px; left: 40px; right: 32px; border-top: 1px solid var(--line); padding-top: 18px;
+      display: flex; justify-content: space-between; align-items: center; font-size: 9px; letter-spacing: 1px; color: var(--muted); }
+    .status { display: flex; align-items: center; gap: 9px; }
+    .status i { background: #93c6a3; border-radius: 50%; width: 5px; height: 5px; box-shadow: 0 0 10px #93c6a380; }
+    button.reset { background: transparent; color: #c5cbbf; border: 1px solid #ffffff28; padding: 8px 11px; font: inherit; cursor: pointer; }
+    button.reset:hover { border-color: var(--gold); color: var(--gold); }
+    button:focus-visible { outline: 2px solid #91dce1; outline-offset: 3px; }
+    .loading { position: absolute; inset: 0; display: grid; place-content: center; background: #101716; z-index: 5; text-align: center; padding: 30px; }
+    .loading b { font-weight: 400; font-size: 15px; color: var(--gold); letter-spacing: 4px; }
+    .loading p { font-size: 11px; color: #99a69c; line-height: 1.8; max-width: 440px; }
+    [hidden] { display: none !important; }
+    @media (max-width: 680px) {
+      header { top: 22px; left: 20px; } h1 { margin-top: 16px; font-size: 42px; }
+      .eyebrow { font-size: 8px; letter-spacing: 2px; } .subtitle { font-size: 10px; }
+      .edition { display: none; } #gui { top: auto; bottom: 87px; right: 16px; width: 224px; }
+      .readout { left: 20px; bottom: 100px; max-width: 110px; } .readout strong { font-size: 17px; }
+      .readout small, .readout p { font-size: 8px; line-height: 1.6; }
+      footer { left: 20px; right: 16px; bottom: 20px; font-size: 8px; gap: 12px; } .gestures { display: none; }
+    }
+    @media (prefers-reduced-motion: reduce) { .vignette { box-shadow: none; } }
+  </style>
+  <script type="importmap">
+    { "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/",
+      "lil-gui": "https://cdn.jsdelivr.net/npm/lil-gui@0.20.0/dist/lil-gui.esm.js"
+    } }
+  </script>
+</head>
+<body>
+  <main id="viewport" aria-label="Interactive 3D mechanical bee. Drag to orbit, scroll to zoom, and use the assembly controls."></main>
+  <div class="vignette"></div>
+  <header>
+    <div class="eyebrow"><span class="emblem">✧</span> CLOCKWORK CONSERVATORY</div>
+    <h1>Apis <span>/ 01</span></h1>
+    <p class="subtitle">A study in mechanical life.</p>
+    <p class="edition">BRASS AUTOMATON &nbsp; / &nbsp; SPECIMEN No. 001</p>
+  </header>
+  <aside id="gui" aria-label="Assembly controls"></aside>
+  <div class="readout"><small id="mode">FLIGHT SYSTEM</small><strong id="frequency">26.0 Hz</strong><p id="assembly">ASSEMBLY INTACT</p></div>
+  <footer>
+    <span class="status"><i></i> <span id="status">MECHANISM ONLINE</span></span>
+    <span class="gestures">DRAG TO ORBIT &nbsp; · &nbsp; SCROLL TO EXPLORE &nbsp; · &nbsp; RIGHT-DRAG TO PAN</span>
+    <button class="reset" id="reset" type="button">RESET VIEW ↗</button>
+  </footer>
+  <div class="loading" id="loading" role="status"><b>ASSEMBLING APIS</b><p>Machining the wings, winding the springs.</p></div>
+  <script type="module">
+    const loading = document.getElementById('loading');
+    function ShowError(error)
+    {
+      loading.hidden = false;
+      loading.querySelector('b').textContent = 'THE WORKSHOP IS OFFLINE';
+      loading.querySelector('p').textContent = 'WebGL 2 and an internet connection for Three.js and lil-gui are required. ' + error.message;
+      console.error('[Apis](ShowError)', error);
+    }
+    try
+    {
+      const [THREE, { OrbitControls }, { RoomEnvironment }, { default: GUI }] = await Promise.all([
+        import('three'), import('three/addons/controls/OrbitControls.js'),
+        import('three/addons/environments/RoomEnvironment.js'), import('lil-gui')
+      ]);
+      Start(THREE, OrbitControls, RoomEnvironment, GUI);
+    }
+    catch (error) { ShowError(error); }
+
+    function Start(T, OrbitControls, RoomEnvironment, GUI)
+    {
+      const TAU = Math.PI * 2;
+      const V = (x = 0, y = 0, z = 0) => new T.Vector3(x, y, z);
+      const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const state = { explode: 0, frequency: 26, flight: !reducedMotion, speed: 1, wireframe: false, axis: 'Radial' };
+      const renderer = new T.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+      renderer.setPixelRatio(Math.min(devicePixelRatio, 1.75));
+      renderer.setSize(innerWidth, innerHeight);
+      renderer.outputColorSpace = T.SRGBColorSpace;
+      renderer.toneMapping = T.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.05;
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = T.PCFSoftShadowMap;
+      document.getElementById('viewport').appendChild(renderer.domElement);
+      renderer.domElement.setAttribute('aria-label', 'Procedural steampunk bee in a cinematic studio');
+      const scene = new T.Scene();
+      scene.background = new T.Color('#101918');
+      scene.fog = new T.FogExp2('#101918', .024);
+      const camera = new T.PerspectiveCamera(39, innerWidth / innerHeight, .1, 100);
+      const controls = new OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.dampingFactor = .065;
+      controls.minDistance = 5;
+      controls.maxDistance = 32;
+      controls.maxPolarAngle = Math.PI * .86;
+      let framingScale = Math.max(1, .76 / camera.aspect);
+      function ResetView()
+      {
+        camera.position.set(-8.2 * framingScale, 5.4 * framingScale, 10.8 * framingScale);
+        controls.maxDistance = 32 * framingScale;
+        controls.target.set(.2, .05, 0);
+        controls.update();
+      }
+      ResetView();
+      document.getElementById('reset').addEventListener('click', ResetView);
+      const environment = new RoomEnvironment();
+      const generator = new T.PMREMGenerator(renderer);
+      const environmentTarget = generator.fromScene(environment, .04);
+      scene.environment = environmentTarget.texture;
+      scene.environmentIntensity = .65;
+      environment.dispose();
+      generator.dispose();
+      scene.add(new T.HemisphereLight('#c4ded7', '#443622', 1.3));
+      function Light(color, intensity, position)
+      {
+        const light = new T.DirectionalLight(color, intensity);
+        light.position.copy(position); scene.add(light); return light;
+      }
+      const key = Light('#ffe0ac', 4.2, V(-3, 7, 5));
+      key.castShadow = true;
+      key.shadow.mapSize.set(2048, 2048);
+      Object.assign(key.shadow.camera, { left: -9, right: 9, top: 9, bottom: -9, near: .1, far: 30 });
+      key.shadow.normalBias = .025;
+      key.shadow.bias = -.0003;
+      key.shadow.radius = 3;
+      Light('#9dd9e3', 3.3, V(3, 4, -6));
+      Light('#ffb862', 1.5, V(4, 1, 4));
+
+      // 固定种子让程序纹理与每次生成的机械细节保持一致。
+      let seed = 8128;
+      function Random() { seed = (1664525 * seed + 1013904223) >>> 0; return seed / 4294967296; }
+      function SurfaceTexture(copper = false)
+      {
+        const canvas = document.createElement('canvas'); canvas.width = canvas.height = 256;
+        const context = canvas.getContext('2d');
+        const pixels = context.createImageData(256, 256);
+        for (let y = 0; y < 256; y++)
+        {
+          for (let x = 0; x < 256; x++)
+          {
+            const index = (y * 256 + x) * 4;
+            const grain = Random() * 22 + Math.sin(y * 2.2) * 8;
+            const patina = Math.sin(x * .038 + Math.sin(y * .024) * 3) * Math.sin(y * .053) > .26;
+            const color = copper ? (patina ? [49, 109, 91] : [168, 99, 53]) : [184, 184, 184];
+            pixels.data[index] = color[0] + grain;
+            pixels.data[index + 1] = color[1] + grain;
+            pixels.data[index + 2] = color[2] + grain;
+            pixels.data[index + 3] = 255;
+          }
+        }
+        context.putImageData(pixels, 0, 0);
+        const texture = new T.CanvasTexture(canvas);
+        texture.wrapS = texture.wrapT = T.RepeatWrapping;
+        texture.repeat.set(2, 2);
+        if (copper) texture.colorSpace = T.SRGBColorSpace;
+        texture.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+        return texture;
+      }
+      const grain = SurfaceTexture();
+      const brass = new T.MeshStandardMaterial({ color: '#c89b46', metalness: .88, roughness: .29, roughnessMap: grain, bumpMap: grain, bumpScale: .008 });
+      const gold = new T.MeshStandardMaterial({ color: '#f1cc78', metalness: .92, roughness: .23 });
+      const copper = new T.MeshStandardMaterial({ map: SurfaceTexture(true), metalness: .8, roughness: .43, bumpMap: grain, bumpScale: .013 });
+      const steel = new T.MeshStandardMaterial({ color: '#263b49', metalness: .91, roughness: .28, roughnessMap: grain });
+      const dark = new T.MeshStandardMaterial({ color: '#151d1d', metalness: .7, roughness: .38 });
+      const amber = new T.MeshPhysicalMaterial({ color: '#eaa126', metalness: .15, roughness: .16, transmission: .38, thickness: .25, ior: 1.48, clearcoat: 1, emissive: '#b84600', emissiveIntensity: .22 });
+      const coreMaterial = new T.MeshStandardMaterial({ color: '#ffd288', emissive: '#ff8c22', emissiveIntensity: 3, metalness: .3, roughness: .2 });
+      const cyan = new T.MeshStandardMaterial({ color: '#8affea', emissive: '#2bd9c6', emissiveIntensity: 2.1, metalness: .3, roughness: .2 });
+      const wingMaterial = new T.MeshPhysicalMaterial({ color: '#c6e0c8', metalness: .18, roughness: .24, transmission: .55, thickness: .045,
+        ior: 1.32, transparent: true, opacity: .66, side: T.DoubleSide, depthWrite: false,
+        iridescence: 1, iridescenceIOR: 1.36, iridescenceThicknessRange: [180, 650], clearcoat: 1 });
+      const wingGhostMaterial = wingMaterial.clone(); wingGhostMaterial.opacity = .075; wingGhostMaterial.transmission = 0;
+      const bee = new T.Group(); scene.add(bee);
+      const partList = [], gearList = [], wingList = [], antennaList = [], legList = [];
+      const sphereGeometry = new T.SphereGeometry(1, 24, 16);
+      const cylinderGeometry = new T.CylinderGeometry(1, 1, 1, 12);
+      const boltGeometry = new T.CylinderGeometry(.027, .027, .018, 6);
+      function Mesh(parent, geometry, material, position = V())
+      {
+        const mesh = new T.Mesh(geometry, material); mesh.position.copy(position);
+        mesh.castShadow = true; mesh.receiveShadow = true; parent.add(mesh); return mesh;
+      }
+      function Ball(parent, position, scale, material)
+      {
+        const mesh = Mesh(parent, sphereGeometry, material, position); mesh.scale.copy(scale); return mesh;
+      }
+      function Rod(parent, from, to, radius, material)
+      {
+        const mesh = Mesh(parent, cylinderGeometry, material, from.clone().add(to).multiplyScalar(.5));
+        mesh.scale.set(radius, from.distanceTo(to), radius);
+        mesh.quaternion.setFromUnitVectors(V(0, 1, 0), to.clone().sub(from).normalize()); return mesh;
+      }
+      function Ring(parent, position, radius, tube, material, axis = 'z')
+      {
+        const mesh = Mesh(parent, new T.TorusGeometry(radius, tube, 8, 64), material, position);
+        if (axis === 'x') mesh.rotation.y = Math.PI / 2;
+        if (axis === 'y') mesh.rotation.x = Math.PI / 2;
+        return mesh;
+      }
+      function Tube(parent, points, radius, material, segments = 64)
+      {
+        return Mesh(parent, new T.TubeGeometry(new T.CatmullRomCurve3(points), segments, radius, 6, false), material);
+      }
+      function Bolts(parent, positions, normals)
+      {
+        const instances = new T.InstancedMesh(boltGeometry, gold, positions.length);
+        const transform = new T.Object3D();
+        positions.forEach((position, index) => {
+          transform.position.copy(position); transform.quaternion.setFromUnitVectors(V(0, 1, 0), normals[index]);
+          transform.updateMatrix(); instances.setMatrixAt(index, transform.matrix);
+        });
+        instances.castShadow = true; instances.receiveShadow = true; parent.add(instances);
+      }
+      function Part(parent, name, position, radial, axial)
+      {
+        const group = new T.Group(); group.name = name; group.position.copy(position); parent.add(group);
+        partList.push({ group, base: position.clone(), radial, axial, offset: V() }); return group;
+      }
+      function Coil(parent, start, end, radius, turns, material, wire = .018)
+      {
+        const direction = end.clone().sub(start).normalize();
+        const tangent = V(0, 0, 1).cross(direction).normalize();
+        if (tangent.lengthSq() < .01) tangent.set(1, 0, 0);
+        const bitangent = direction.clone().cross(tangent).normalize();
+        const points = [];
+        for (let index = 0; index <= turns * 18; index++)
+        {
+          const t = index / (turns * 18), angle = t * TAU * turns;
+          points.push(start.clone().lerp(end, t).addScaledVector(tangent, Math.cos(angle) * radius).addScaledVector(bitangent, Math.sin(angle) * radius));
+        }
+        return Tube(parent, points, wire, material, turns * 20);
+      }
+
+      // 胸腔保留开放的传动侧面，使齿轮、轴承与连杆始终可见。
+      Ball(bee, V(), V(1.02, .57, .46), dark);
+      Rod(bee, V(-1.15, 0, 0), V(1.15, 0, 0), .16, steel);
+      for (const side of [-1, 1])
+      {
+        const frame = Part(bee, 'Thorax frame', V(0, 0, side * .56), V(0, .3, side * .65), V(0, 0, side * 1.2));
+        const rim = Ring(frame, V(), .64, .048, copper); rim.scale.x = 1.52;
+        const innerRim = Ring(frame, V(0, 0, side * .025), .57, .018, gold); innerRim.scale.x = 1.52;
+        const positions = [], normals = [];
+        for (let index = 0; index < 20; index++)
+        {
+          const angle = index / 20 * TAU;
+          positions.push(V(Math.cos(angle) * .94, Math.sin(angle) * .63, side * .035)); normals.push(V(0, 0, side));
+        }
+        Bolts(frame, positions, normals);
+      }
+      for (let index = 0; index < 7; index++)
+      {
+        const x = -.8 + index * .25, points = [];
+        for (let step = 0; step <= 20; step++)
+        {
+          const angle = step / 20 * Math.PI;
+          points.push(V(x, Math.sin(angle) * .57, Math.cos(angle) * .53));
+        }
+        Tube(bee, points, .035, index % 2 ? copper : brass, 32);
+      }
+      for (const side of [-1, 1])
+      {
+        Tube(bee, [V(-.85, .25, side * .32), V(-.45, .73, side * .30), V(.4, .72, side * .27), V(.85, .3, side * .35)], .034, copper);
+        Coil(bee, V(-.7, -.37, side * .47), V(.7, -.37, side * .47), .066, 18, steel, .013);
+      }
+      Ball(bee, V(0, .57, 0), V(.36, .18, .3), brass);
+      Ring(bee, V(0, .73, 0), .17, .026, gold, 'y');
+      Ball(bee, V(0, .73, 0), V(.13, .06, .13), amber);
+
+      // 20 度渐开线齿形；同模数齿轮以节圆相切，按齿数反比联动。
+      const gearModule = .03;
+      function GearGeometry(teeth)
+      {
+        const pitch = teeth * gearModule / 2, base = pitch * Math.cos(Math.PI / 9);
+        const root = pitch - 1.25 * gearModule, tip = pitch + gearModule;
+        const involute = radius => { const t = Math.sqrt(Math.max(0, radius * radius / (base * base) - 1)); return t - Math.atan(t); };
+        const halfTooth = Math.PI / (2 * teeth) - .012 / teeth;
+        const pointList = [];
+        function Point(radius, angle) { pointList.push(new T.Vector2(Math.cos(angle) * radius, Math.sin(angle) * radius)); }
+        for (let tooth = 0; tooth < teeth; tooth++)
+        {
+          const angle = tooth * TAU / teeth;
+          Point(root, angle - Math.PI / teeth);
+          Point(root, angle - halfTooth - involute(pitch));
+          for (let step = 0; step <= 5; step++)
+          {
+            const radius = Math.max(root, base) + (tip - Math.max(root, base)) * step / 5;
+            Point(radius, angle - halfTooth - involute(pitch) + involute(radius));
+          }
+          for (let step = 5; step >= 0; step--)
+          {
+            const radius = Math.max(root, base) + (tip - Math.max(root, base)) * step / 5;
+            Point(radius, angle + halfTooth + involute(pitch) - involute(radius));
+          }
+          Point(root, angle + halfTooth + involute(pitch));
+          Point(root, angle + Math.PI / teeth);
+        }
+        const shape = new T.Shape(pointList);
+        const hole = new T.Path(); hole.absarc(0, 0, pitch * .68, 0, TAU, true); shape.holes.push(hole);
+        const geometry = new T.ExtrudeGeometry(shape, { depth: .075, bevelEnabled: false, curveSegments: 48 });
+        geometry.translate(0, 0, -.0375); return geometry;
+      }
+      const gearGeometryMap = new Map([28, 20, 14].map(teeth => [teeth, GearGeometry(teeth)]));
+      function Gear(parent, teeth, position, ratio, phase, side)
+      {
+        const mount = Part(parent, teeth + '-tooth gear', position, V(0, .12, side * (1.15 + teeth * .012)), V(0, 0, side * (1.5 + teeth * .015)));
+        const rotor = new T.Group(); mount.add(rotor);
+        Mesh(rotor, gearGeometryMap.get(teeth), teeth === 20 ? copper : brass);
+        const radius = teeth * gearModule / 2;
+        Ring(rotor, V(), radius * .69, .017, gold);
+        for (let index = 0; index < 6; index++)
+        {
+          const angle = index / 6 * TAU;
+          Rod(rotor, V(Math.cos(angle) * .075, Math.sin(angle) * .075, 0), V(Math.cos(angle) * radius * .7, Math.sin(angle) * radius * .7, 0), .025, brass);
+        }
+        Rod(rotor, V(0, 0, -.07), V(0, 0, .07), .084, steel);
+        Ring(rotor, V(0, 0, side * .085), .06, .014, gold);
+        Rod(mount, V(0, 0, -.13), V(0, 0, .13), .032, gold);
+        gearList.push({ rotor, ratio, phase, teeth });
+      }
+      for (const side of [-1, 1])
+      {
+        Gear(bee, 28, V(-.25, .14, side * .66), 1, 0, side);
+        Gear(bee, 20, V(.47, .14, side * .66), -28 / 20, Math.PI - Math.PI / 20, side);
+        const contactAngle = -Math.PI / 2;
+        Gear(bee, 14, V(-.25, -.49, side * .66), -2, contactAngle + Math.PI + (28 * contactAngle - Math.PI) / 14, side);
+      }
+
+      const headMount = Part(bee, 'Head', V(-1.43, .07, 0), V(-1.35, .1, 0), V(-1.7, 0, 0));
+      const head = new T.Group(); headMount.add(head);
+      Ball(head, V(.3, 0, 0), V(.38, .32, .34), steel);
+      Ring(head, V(.3, 0, 0), .31, .04, gold, 'x');
+      Ball(head, V(-.06, 0, 0), V(.62, .55, .48), brass);
+      Ball(head, V(-.34, -.21, 0), V(.38, .25, .37), copper);
+      for (const side of [-1, 1])
+      {
+        const eye = Part(head, 'Compound eye', V(-.21, .08, side * .43), V(-.12, .08, side * .52), V(-.35, 0, side * .65));
+        eye.rotation.y = side * -.24;
+        const bezel = Ring(eye, V(), .37, .045, steel); bezel.scale.set(1.08, 1.23, 1);
+        const trim = Ring(eye, V(0, 0, side * .018), .38, .014, gold); trim.scale.set(1.08, 1.23, 1);
+        Ball(eye, V(), V(.39, .45, .225), amber);
+        const lensPositionList = [];
+        for (let row = -7; row <= 7; row++)
+        {
+          for (let column = -7; column <= 7; column++)
+          {
+            const x = (column + (row & 1) * .5) * .051, y = row * .046;
+            const distance = x * x / (.38 * .38) + y * y / (.44 * .44);
+            if (distance < .96) lensPositionList.push(V(x, y, side * .23 * Math.sqrt(1 - distance)));
+          }
+        }
+        const lenses = new T.InstancedMesh(new T.CylinderGeometry(.027, .025, .025, 6), amber, lensPositionList.length);
+        const transform = new T.Object3D();
+        lensPositionList.forEach((position, index) => {
+          transform.position.copy(position);
+          transform.quaternion.setFromUnitVectors(V(0, 1, 0), V(position.x / .1521, position.y / .2025, position.z / .0529).normalize());
+          transform.updateMatrix(); lenses.setMatrixAt(index, transform.matrix);
+          lenses.setColorAt(index, new T.Color().setHSL(.065 + Random() * .045, .8, .45 + Random() * .18));
+        });
+        eye.add(lenses);
+        const antenna = Part(head, 'Spring antenna', V(-.25, .43, side * .23), V(-.2, .65, side * .3), V(-.5, .65, side * .28));
+        Ball(antenna, V(), V(.095, .095, .095), steel);
+        const end = V(-.28, .74, side * .18);
+        Rod(antenna, V(), end, .022, copper);
+        Coil(antenna, V(-.015, .08, side * .02), end, .065, 11, gold, .016);
+        Ball(antenna, end, V(.085, .085, .085), amber);
+        Ring(antenna, end, .085, .012, brass);
+        antennaList.push({ group: antenna, side });
+        Tube(head, [V(-.54, -.24, side * .16), V(-.81, -.38, side * .24), V(-.8, -.47, side * .09)], .045, steel, 24);
+      }
+      for (let index = -2; index <= 2; index++)
+      {
+        Tube(head, [V(-.51, .17, index * .075), V(-.39, .45, index * .085), V(-.1, .55, index * .09), V(.19, .44, index * .08)], .014, gold, 24);
+      }
+
+      const abdomenCore = Part(bee, 'Power core', V(1.83, 0, 0), V(.5, -.15, 0), V(.6, 0, 0));
+      Rod(abdomenCore, V(-.92, 0, 0), V(.94, 0, 0), .2, coreMaterial);
+      for (let index = 0; index < 12; index++) Ring(abdomenCore, V(-.86 + index * .15, 0, 0), .24, .028, index % 3 ? steel : cyan, 'x');
+      Coil(abdomenCore, V(-.9, 0, 0), V(.9, 0, 0), .29, 7, copper, .023);
+      const coreLight = new T.PointLight('#ff9b30', 2.2, 3); abdomenCore.add(coreLight);
+      const shellBrass = brass.clone(), shellCopper = copper.clone();
+      shellBrass.side = shellCopper.side = T.DoubleSide;
+      const segmentList = [ [1.02, .34, .49], [1.43, .39, .65], [1.9, .41, .66], [2.36, .36, .51], [2.73, .27, .32] ];
+      segmentList.forEach(([x, width, radius], index) => {
+        const segment = Part(bee, 'Abdomen segment ' + (index + 1), V(x, 0, 0), V(.48 + index * .39, .23 + index * .16, 0), V(.8 + index * .55, 0, 0));
+        const profile = [new T.Vector2(radius * .9, -width / 2), new T.Vector2(radius, -width * .27), new T.Vector2(radius, width * .27), new T.Vector2(radius * .9, width / 2)];
+        const shell = Mesh(segment, new T.LatheGeometry(profile, 56, .15, TAU - .7), index % 2 ? shellBrass : shellCopper); shell.rotation.z = -Math.PI / 2;
+        for (const end of [-1, 1]) Ring(segment, V(end * width / 2, 0, 0), radius * .9, .025, gold, 'x');
+        const belt = Ring(segment, V(), radius + .005, .035, steel, 'x'); belt.scale.z = .85;
+        const positions = [], normals = [];
+        for (let bolt = 0; bolt < 16; bolt++)
+        {
+          const angle = .4 + bolt / 15 * (TAU - 1.4), normal = V(0, -Math.sin(angle), Math.cos(angle));
+          positions.push(normal.clone().multiplyScalar(radius + .018)); normals.push(normal);
+        }
+        Bolts(segment, positions, normals);
+      });
+      const stinger = Part(bee, 'Spiral stinger', V(2.97, -.03, 0), V(2.65, -.25, 0), V(3.9, 0, 0));
+      Ring(stinger, V(), .19, .04, brass, 'x');
+      const spiral = [];
+      for (let index = 0; index <= 150; index++)
+      {
+        const t = index / 150, angle = t * TAU * 3.8, radius = .155 * (1 - t);
+        spiral.push(V(t * .92, Math.cos(angle) * radius - t * .12, Math.sin(angle) * radius));
+      }
+      Tube(stinger, spiral, .027, gold, 160);
+      const needle = Mesh(stinger, new T.ConeGeometry(.09, 1.05, 24), steel, V(.48, -.06, 0)); needle.rotation.z = -Math.PI / 2;
+
+      // 翼膜网格、边框和叶脉共用同一曲面，避免振翅时互相脱离。
+      function Wing(side, rear)
+      {
+        const root = Part(bee, rear ? 'Hindwing' : 'Forewing', V(rear ? .43 : -.57, .43, side * .4), V(rear ? .5 : -.4, .9, side * 1.65), V(rear ? .9 : -.6, .95, side * 1.8));
+        const pivot = new T.Group(); root.add(pivot); pivot.scale.z = side;
+        const span = rear ? .78 : 1, chord = rear ? .78 : 1;
+        const shape = new T.Shape(); shape.moveTo(0, 0);
+        shape.bezierCurveTo(.65, -.64, 2.7, -.82, 3.5, -.1);
+        shape.bezierCurveTo(3.86, .21, 2.55, 1.04, 1.3, .8);
+        shape.bezierCurveTo(.5, .65, .12, .13, 0, 0);
+        function WingPoint(u, v) { return V(v * chord + (rear ? u * .18 : -u * .12), Math.sin(u / 3.8 * Math.PI) * .12, u * span); }
+        const geometry = new T.ShapeGeometry(shape, 40);
+        const positions = geometry.attributes.position;
+        for (let index = 0; index < positions.count; index++)
+        {
+          const point = WingPoint(positions.getX(index), positions.getY(index)); positions.setXYZ(index, point.x, point.y, point.z);
+        }
+        geometry.computeVertexNormals();
+        const membrane = Mesh(pivot, geometry, wingMaterial); membrane.castShadow = false; membrane.receiveShadow = false;
+        const outline = shape.getPoints(80).map(point => WingPoint(point.x, point.y));
+        Tube(pivot, outline, .019, brass, 150).castShadow = false;
+        const veinList = [ [[0, 0], [.8, -.22], [2.1, -.35], [3.5, -.1]],
+          [[0, 0], [.9, .13], [2, .24], [3.2, .34]], [[0, 0], [.65, .37], [1.6, .64], [2.7, .56]] ];
+        veinList.forEach(vein => Tube(pivot, vein.map(([u, v]) => WingPoint(u, v)), .012, copper, 45).castShadow = false);
+        for (let index = 1; index <= 10; index++)
+        {
+          const u = index * .28, width = Math.sin(u / 3.5 * Math.PI);
+          Tube(pivot, [WingPoint(u, -.46 * width), WingPoint(u + .11, .05), WingPoint(u + .02, .76 * width)], .0065, gold, 12).castShadow = false;
+        }
+        const rootJoint = Rod(root, V(-.15, 0, 0), V(.15, 0, 0), .1, steel);
+        Ring(rootJoint, V(0, .4, 0), 1.04, .12, gold, 'y');
+        const ghostList = [];
+        for (let index = 0; index < 2; index++)
+        {
+          const ghost = Mesh(root, geometry, wingGhostMaterial); ghost.scale.z = side; ghost.castShadow = false; ghost.receiveShadow = false;
+          ghostList.push(ghost);
+        }
+        wingList.push({ pivot, ghostList, side, rear });
+      }
+      for (const side of [-1, 1]) { Wing(side, false); Wing(side, true); }
+
+      for (const side of [-1, 1])
+      {
+        for (let index = 0; index < 3; index++)
+        {
+          const root = Part(bee, 'Leg ' + (index + 1), V(-.73 + index * .67, -.4, side * .44), V((index - 1) * .42, -.16, side * 1.25), V((index - 1) * .6, -.2, side * 1.15));
+          const hip = new T.Group(); root.add(hip); hip.scale.z = side;
+          const kneePosition = V((index - 1) * .28, -.4, .43);
+          Ball(hip, V(), V(.13, .13, .13), brass);
+          Rod(hip, V(), kneePosition, .064, copper);
+          Rod(hip, V(-.075, 0, .02), kneePosition.clone().add(V(-.075, 0, 0)), .021, gold);
+          Ball(hip, kneePosition, V(.11, .11, .11), steel);
+          Ring(hip, kneePosition, .095, .019, gold);
+          const knee = new T.Group(); hip.add(knee); knee.position.copy(kneePosition);
+          const ankle = V(index === 0 ? -.25 : .12, -.59, .22);
+          Rod(knee, V(), ankle, .043, steel);
+          Rod(knee, V(.06, -.03, 0), ankle.clone().multiplyScalar(.68).add(V(.06, 0, 0)), .025, brass);
+          Coil(knee, V(0, -.08, .01), ankle.clone().multiplyScalar(.65), .055, 7, gold, .012);
+          Ball(knee, ankle, V(.075, .075, .075), copper);
+          const foot = ankle.clone().add(V(-.1, -.25, -.08));
+          Rod(knee, ankle, foot, .028, brass);
+          for (const direction of [-1, 1]) Tube(knee, [foot, foot.clone().add(V(-.12, -.04, direction * .07)), foot.clone().add(V(-.16, .045, direction * .1))], .018, steel, 12);
+          legList.push({ hip, knee, index, side });
+        }
+      }
+
+      const leaderMaterial = new T.LineBasicMaterial({ color: '#6fe8ef', transparent: true, opacity: 0, depthWrite: false });
+      const leaderPositions = new Float32Array(partList.length * 6);
+      const leaderGeometry = new T.BufferGeometry();
+      leaderGeometry.setAttribute('position', new T.BufferAttribute(leaderPositions, 3).setUsage(T.DynamicDrawUsage));
+      const leaders = new T.LineSegments(leaderGeometry, leaderMaterial); leaders.frustumCulled = false; bee.add(leaders);
+      const platformMaterial = new T.MeshStandardMaterial({ color: '#0c1413', metalness: .35, roughness: .65, envMapIntensity: .25 });
+      Mesh(scene, new T.CylinderGeometry(4.6, 4.67, .14, 128), platformMaterial, V(0, -2.02, 0));
+      Ring(scene, V(0, -1.94, 0), 4.45, .012, brass, 'y');
+      Ring(scene, V(0, -1.94, 0), 4.14, .006, steel, 'y');
+      const tickPositions = [];
+      for (let index = 0; index < 120; index++)
+      {
+        const angle = index / 120 * TAU, length = index % 5 ? .07 : .17;
+        tickPositions.push(Math.cos(angle) * (4.4 - length), -1.939, Math.sin(angle) * (4.4 - length), Math.cos(angle) * 4.4, -1.939, Math.sin(angle) * 4.4);
+      }
+      const ticks = new T.BufferGeometry(); ticks.setAttribute('position', new T.Float32BufferAttribute(tickPositions, 3));
+      scene.add(new T.LineSegments(ticks, new T.LineBasicMaterial({ color: '#776449', transparent: true, opacity: .6 })));
+      const floor = Mesh(scene, new T.PlaneGeometry(200, 200), new T.MeshStandardMaterial({ color: '#0a1211', roughness: .9, metalness: .05 }), V(0, -2.11, 0));
+      floor.rotation.x = -Math.PI / 2; floor.castShadow = false;
+
+      // 只收集模型材质，线框模式不会改变展台和灯光。
+      const materialSet = new Set();
+      bee.traverse(object => { if (object.isMesh) materialSet.add(object.material); });
+      const gui = new GUI({ container: document.getElementById('gui'), title: 'MECHANISM / CONTROLS', width: '100%' });
+      gui.add(state, 'explode', 0, 1, .001).name('Exploded View');
+      gui.add(state, 'frequency', 0, 60, .1).name('Flap Frequency');
+      gui.add(state, 'flight').name('Flight / Idle');
+      gui.add(state, 'speed', .1, 5, .1).name('Gear Speed');
+      gui.add(state, 'wireframe').name('Wireframe').onChange(value => materialSet.forEach(material => { material.wireframe = value; }));
+      gui.add(state, 'axis', ['Radial', 'Axial']).name('Explode Axis');
+      if (innerWidth < 680) gui.close();
+      const frequencyLabel = document.getElementById('frequency'), modeLabel = document.getElementById('mode');
+      const assemblyLabel = document.getElementById('assembly'), statusLabel = document.getElementById('status');
+      const temporaryStart = V(), temporaryEnd = V(), desiredOffset = V();
+      let previousTime = performance.now(), elapsed = 0, flapPhase = 0, gearPhase = 0, explosion = 0, flightBlend = state.flight ? 1 : 0, uiTime = 0;
+      let contextLost = false;
+      renderer.domElement.addEventListener('webglcontextlost', event => {
+        event.preventDefault(); contextLost = true; renderer.setAnimationLoop(null); ShowError(new Error('The graphics context was lost. Reload to restart.'));
+      });
+      document.addEventListener('visibilitychange', () => { previousTime = performance.now(); });
+      addEventListener('resize', () => {
+        camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
+        const nextScale = Math.max(1, .76 / camera.aspect);
+        camera.position.sub(controls.target).multiplyScalar(nextScale / framingScale).add(controls.target);
+        framingScale = nextScale; controls.maxDistance = 32 * framingScale;
+        renderer.setPixelRatio(Math.min(devicePixelRatio, 1.75)); renderer.setSize(innerWidth, innerHeight);
+      });
+
+      function Animate(now)
+      {
+        if (contextLost || document.hidden) return;
+        const delta = Math.max(0, (now - previousTime) / 1000); previousTime = now;
+        const smoothing = 1 - Math.exp(-delta * 7);
+        elapsed += delta;
+        explosion += (state.explode - explosion) * smoothing;
+        flightBlend += ((state.flight ? 1 : 0) - flightBlend) * smoothing;
+        flapPhase = (flapPhase + TAU * state.frequency * delta) % TAU;
+        // 周期同时覆盖 28、20、14 齿齿轮，避免模运算导致从动轮跳变。
+        gearPhase = (gearPhase + delta * .7 * state.speed) % (TAU * 5);
+        bee.position.y = .12 + Math.sin(elapsed * 1.5) * .07 * flightBlend;
+        bee.rotation.x = Math.sin(elapsed * .85) * .022 * flightBlend;
+        bee.rotation.z = Math.sin(elapsed * 1.1) * .018 * flightBlend;
+        head.rotation.y = Math.sin(elapsed * .8) * .045;
+        head.rotation.z = Math.sin(elapsed * 1.15) * .028;
+        partList.forEach(part => {
+          desiredOffset.copy(state.axis === 'Radial' ? part.radial : part.axial).multiplyScalar(explosion);
+          part.offset.lerp(desiredOffset, smoothing);
+          part.group.position.copy(part.base).add(part.offset);
+        });
+        gearList.forEach(gear => { gear.rotor.rotation.z = gear.phase + gearPhase * gear.ratio; });
+        wingList.forEach(wing => {
+          const phase = flapPhase + (wing.rear ? .52 : 0);
+          const amplitude = .48 * flightBlend * (1 - explosion * .8);
+          const restAngle = .10 + (1 - flightBlend) * .12;
+          wing.pivot.rotation.x = wing.side * (restAngle + Math.sin(phase) * amplitude);
+          wing.pivot.rotation.y = wing.side * (wing.rear ? .12 : -.09);
+          wing.ghostList.forEach((ghost, index) => {
+            ghost.visible = state.frequency > 12 && flightBlend > .05 && explosion < .85 && !state.wireframe;
+            ghost.rotation.x = wing.side * (restAngle + Math.sin(phase - TAU * state.frequency * (index + 1) / 240) * amplitude);
+            ghost.rotation.y = wing.pivot.rotation.y;
+          });
+        });
+        antennaList.forEach(antenna => { antenna.group.rotation.z = Math.sin(elapsed * 2.3 + antenna.side) * .075; antenna.group.rotation.x = Math.sin(elapsed * 1.7) * .055; });
+        legList.forEach(leg => { leg.hip.rotation.x = leg.side * (flightBlend * .14 + Math.sin(elapsed * 1.8 + leg.index) * .035); leg.knee.rotation.z = Math.sin(elapsed * 1.5 + leg.index * 1.6) * .06; });
+        coreMaterial.emissiveIntensity = 2.5 + Math.sin(elapsed * 2.6) * .45;
+        coreLight.intensity = 1.8 + Math.sin(elapsed * 2.6) * .3;
+        leaderMaterial.opacity = Math.min(.65, explosion * 1.8);
+        leaders.visible = explosion > .002;
+        if (leaders.visible)
+        {
+          bee.updateMatrixWorld(true);
+          partList.forEach((part, index) => {
+            temporaryStart.copy(part.base); part.group.parent.localToWorld(temporaryStart); bee.worldToLocal(temporaryStart);
+            part.group.getWorldPosition(temporaryEnd); bee.worldToLocal(temporaryEnd);
+            temporaryStart.toArray(leaderPositions, index * 6); temporaryEnd.toArray(leaderPositions, index * 6 + 3);
+          });
+          leaderGeometry.attributes.position.needsUpdate = true;
+        }
+        const zoom = 1 / (1 + explosion * .42);
+        if (Math.abs(camera.zoom - zoom) > .0001) { camera.zoom = zoom; camera.updateProjectionMatrix(); }
+        controls.update(delta);
+        renderer.render(scene, camera);
+        if (now - uiTime > 120)
+        {
+          uiTime = now;
+          frequencyLabel.textContent = state.flight ? state.frequency.toFixed(1) + ' Hz' : 'STANDBY';
+          modeLabel.textContent = state.flight ? 'FLIGHT SYSTEM' : 'IDLE SYSTEM';
+          assemblyLabel.textContent = explosion < .005 ? 'ASSEMBLY INTACT' : 'EXPLODED ' + Math.round(explosion * 100) + '%';
+          statusLabel.textContent = state.flight ? 'MECHANISM ONLINE' : 'MECHANISM IDLING';
+        }
+      }
+
+      // 结构自检覆盖指定数量、传动比和有效顶点，避免静默生成缺件。
+      if (wingList.length !== 4 || legList.length !== 6 || segmentList.length !== 5) throw new Error('Incomplete mechanical assembly.');
+      if (Math.abs(28 + gearList[1].teeth * gearList[1].ratio) > 1e-9) throw new Error('Invalid gear ratio.');
+      bee.traverse(object => {
+        const vertices = object.geometry?.attributes.position?.array;
+        if (vertices && !vertices.every(Number.isFinite)) throw new Error('Invalid procedural geometry.');
+      });
+      Animate(performance.now());
+      loading.hidden = true;
+      renderer.setAnimationLoop(Animate);
+    }
+  </script>
+</body>
+</html>
