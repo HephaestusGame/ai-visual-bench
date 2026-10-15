@@ -10,9 +10,10 @@
       "duration_min": 10,
       "duration": "10 分钟",
       "file": "tests/steampunk-bee/gemini-4-argon/index.html",
-      "thumbnail": "tests/steampunk-bee/gemini-4-argon/thumb.png",
+      "thumbnail": "tests/steampunk-bee/gemini-4-argon/thumb.png?v=1e0813b1",
       "original_filename": "gemini-4argon-10min.html",
-      "source": "Kako Chan 实测提交"
+      "source": "Kako Chan 实测提交",
+      "thumb_version": "1e0813b1"
     },
     {
       "model": "Claude Opus 5.5",
@@ -20,9 +21,10 @@
       "duration_min": 150,
       "duration": "150 分钟",
       "file": "tests/steampunk-bee/claude-opus-5.5/index.html",
-      "thumbnail": "tests/steampunk-bee/claude-opus-5.5/thumb.png",
+      "thumbnail": "tests/steampunk-bee/claude-opus-5.5/thumb.png?v=90435dd5",
       "original_filename": "steampunk-bee-opus5.5-180min.html",
-      "source": "Kako Chan 实测提交"
+      "source": "Kako Chan 实测提交",
+      "thumb_version": "90435dd5"
     },
     {
       "model": "GLM 5.3 Flash",
@@ -30,9 +32,10 @@
       "duration_min": 38,
       "duration": "38 分钟",
       "file": "tests/steampunk-bee/glm-5.3-flash/index.html",
-      "thumbnail": "tests/steampunk-bee/glm-5.3-flash/thumb.png",
+      "thumbnail": "tests/steampunk-bee/glm-5.3-flash/thumb.png?v=897a773c",
       "original_filename": "steampunk-mechanical-bee-38Min-GLM5.3Flash.html",
-      "source": "Kako Chan 实测提交"
+      "source": "Kako Chan 实测提交",
+      "thumb_version": "897a773c"
     },
     {
       "model": "Grok 4.7",
@@ -40,9 +43,10 @@
       "duration_min": 40,
       "duration": "40 分钟",
       "file": "tests/steampunk-bee/grok-4.7/index.html",
-      "thumbnail": "tests/steampunk-bee/grok-4.7/thumb.png",
+      "thumbnail": "tests/steampunk-bee/grok-4.7/thumb.png?v=3be1330c",
       "original_filename": "Grok/steampunk-bee.html",
-      "source": "Kako Chan 实测提交"
+      "source": "Kako Chan 实测提交",
+      "thumb_version": "3be1330c"
     },
     {
       "model": "DeepSeek V41 Flash",
@@ -50,9 +54,10 @@
       "duration_min": 12,
       "duration": "12 分钟",
       "file": "tests/steampunk-bee/v41-flash/index.html",
-      "thumbnail": "tests/steampunk-bee/v41-flash/thumb.png",
+      "thumbnail": "tests/steampunk-bee/v41-flash/thumb.png?v=1af7787e",
       "original_filename": "V41Flash/index.html",
-      "source": "Kako Chan 实测提交"
+      "source": "Kako Chan 实测提交",
+      "thumb_version": "1af7787e"
     },
     {
       "model": "GPT 6 Astra",
@@ -60,9 +65,10 @@
       "duration_min": 18,
       "duration": "18 分钟",
       "file": "tests/steampunk-bee/gpt-6-astra/index.html",
-      "thumbnail": "tests/steampunk-bee/gpt-6-astra/thumb.png",
+      "thumbnail": "tests/steampunk-bee/gpt-6-astra/thumb.png?v=897a2d86",
       "original_filename": "GPT6-Astra/index.html",
-      "source": "Kako Chan 实测提交"
+      "source": "Kako Chan 实测提交",
+      "thumb_version": "897a2d86"
     },
     {
       "model": "GLM 5.3",
@@ -70,9 +76,10 @@
       "duration_min": 15,
       "duration": "15 分钟",
       "file": "tests/steampunk-bee/glm-5.3/index.html",
-      "thumbnail": "tests/steampunk-bee/glm-5.3/thumb.png",
+      "thumbnail": "tests/steampunk-bee/glm-5.3/thumb.png?v=f3c46fa4",
       "original_filename": "GLM-5.3_15min.html",
-      "source": "Kako Chan 实测提交"
+      "source": "Kako Chan 实测提交",
+      "thumb_version": "f3c46fa4"
     }
   ],
   "prompt": "Build a complete, self-contained HTML app using Three.js r160+, OrbitControls, and lil-gui to create a highly detailed, animated 3D steampunk mechanical bee.\n\nDesign: Articulated brass head, amber compound eyes, spring antennae, exposed clockwork gears, four iridescent mechanical wings, six segmented legs, and a five-part abdomen with glowing power core and spiral stinger.\nMaterials: Realistic PBR brass, oxidized copper, blued steel, amber glass, and translucent wings with entirely procedural textures and details.\nAnimation: High-frequency wing flapping, correctly synchronized interlocking gears, moving antennae, and subtle body motion.\nExploded View: Smooth 0–1 slider separating components along radial or axial axes, with cyan leader lines.\nGUI: Exploded View, Flap Frequency (0–60 Hz), Flight/Idle, Gear Speed (0.1×–5×), Wireframe, and Explode Axis controls.\nRendering: Responsive full-screen WebGL, ACES tone mapping, cinematic studio lighting, soft shadows, and smooth delta-time-based animation.\n\nGenerate all geometry and textures procedurally. Use no external models or image assets. Return complete, executable HTML from <!DOCTYPE html> to </html>, with functional controls, clean code, no placeholders, and no TODOs. Prioritize visual fidelity, mechanical detail, and performance.",
