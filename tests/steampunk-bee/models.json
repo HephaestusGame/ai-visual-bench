@@ -1,7 +1,7 @@
 {
   "test": "steampunk-bee",
   "title": "蒸汽朋克机械蜜蜂 / Steampunk Mechanical Bee",
-  "description": "用单个 HTML 文件实现可交互的蒸汽朋克机械蜜蜂。灵感来自 @NovaXCode 于 2026-10-14 发布的帖子（Gemini / argon 4 用单个 html 做出机械蜜蜂）。原始提示词未公开，本测试各作品使用的提示词可能与原帖不同。",
+  "description": "用单个 HTML 文件实现可交互的蒸汽朋克机械蜜蜂。测试灵感来自 @NovaXCode 的帖子；本仓库所有作品均使用下面这段提示词生成。",
   "source": "https://x.com/NovaXCode/status/2110223641111888338",
   "items": [
     {
@@ -54,5 +54,7 @@
       "original_filename": "V41Flash/index.html",
       "source": "Kako Chan 实测提交"
     }
-  ]
+  ],
+  "prompt": "Build a complete, self-contained HTML app using Three.js r160+, OrbitControls, and lil-gui to create a highly detailed, animated 3D steampunk mechanical bee.\n\nDesign: Articulated brass head, amber compound eyes, spring antennae, exposed clockwork gears, four iridescent mechanical wings, six segmented legs, and a five-part abdomen with glowing power core and spiral stinger.\nMaterials: Realistic PBR brass, oxidized copper, blued steel, amber glass, and translucent wings with entirely procedural textures and details.\nAnimation: High-frequency wing flapping, correctly synchronized interlocking gears, moving antennae, and subtle body motion.\nExploded View: Smooth 0–1 slider separating components along radial or axial axes, with cyan leader lines.\nGUI: Exploded View, Flap Frequency (0–60 Hz), Flight/Idle, Gear Speed (0.1×–5×), Wireframe, and Explode Axis controls.\nRendering: Responsive full-screen WebGL, ACES tone mapping, cinematic studio lighting, soft shadows, and smooth delta-time-based animation.\n\nGenerate all geometry and textures procedurally. Use no external models or image assets. Return complete, executable HTML from <!DOCTYPE html> to </html>, with functional controls, clean code, no placeholders, and no TODOs. Prioritize visual fidelity, mechanical detail, and performance.",
+  "prompt_file": "tests/steampunk-bee/PROMPT.md"
 }
