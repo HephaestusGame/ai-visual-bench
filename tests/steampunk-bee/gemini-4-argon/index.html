@@ -1,0 +1,3061 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>Aether-Apis Mk.IV — Clockwork Steampunk Mechanical Bee</title>
+  <style>
+    :root {
+      --brass-light: #f3d286;
+      --brass-mid: #c89b3c;
+      --brass-dark: #5e4314;
+      --cyan-glow: #00f2ff;
+      --amber-glow: #ff9911;
+      --bg-dark: #090b10;
+      --panel-bg: rgba(12, 16, 23, 0.82);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: var(--bg-dark);
+      font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif;
+      color: #e6dcc8;
+    }
+
+    #canvas-container {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      background: radial-gradient(circle at 50% 45%, #1c222e 0%, #0d1017 60%, #05070a 100%);
+    }
+
+    /* Technical Steampunk Telemetry Overlay */
+    #hud-overlay {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      z-index: 10;
+      pointer-events: none;
+      background: var(--panel-bg);
+      border: 1px solid rgba(200, 155, 60, 0.45);
+      border-left: 3px solid var(--brass-mid);
+      border-radius: 4px;
+      padding: 14px 18px;
+      min-width: 270px;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.65), inset 0 0 15px rgba(200, 155, 60, 0.08);
+    }
+
+    .hud-title {
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--brass-light);
+      margin-bottom: 2px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .hud-subtitle {
+      font-size: 10px;
+      letter-spacing: 1.4px;
+      color: rgba(230, 220, 200, 0.55);
+      text-transform: uppercase;
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid rgba(200, 155, 60, 0.25);
+    }
+
+    .hud-grid {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      row-gap: 6px;
+      column-gap: 16px;
+      font-size: 11px;
+      font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+    }
+
+    .hud-label {
+      color: rgba(230, 220, 200, 0.7);
+    }
+
+    .hud-value {
+      color: var(--brass-light);
+      font-weight: 600;
+      text-align: right;
+    }
+
+    .hud-value.cyan {
+      color: var(--cyan-glow);
+      text-shadow: 0 0 8px rgba(0, 242, 255, 0.5);
+    }
+
+    .hud-value.amber {
+      color: var(--amber-glow);
+      text-shadow: 0 0 8px rgba(255, 153, 17, 0.5);
+    }
+
+    .status-dot {
+      display: inline-block;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--amber-glow);
+      box-shadow: 0 0 8px var(--amber-glow);
+      margin-left: 8px;
+    }
+
+    #controls-hint {
+      position: fixed;
+      bottom: 18px;
+      left: 20px;
+      z-index: 10;
+      pointer-events: none;
+      font-size: 11px;
+      letter-spacing: 0.8px;
+      color: rgba(230, 220, 200, 0.5);
+      background: rgba(10, 13, 18, 0.65);
+      padding: 8px 14px;
+      border-radius: 3px;
+      border: 1px solid rgba(200, 155, 60, 0.22);
+    }
+
+    /* Customize lil-gui for Steampunk Brass & Cyan CAD Aesthetic */
+    .lil-gui {
+      --background-color: rgba(12, 16, 23, 0.88);
+      --text-color: #e6dcc8;
+      --title-background-color: #1c1810;
+      --title-text-color: #f3d286;
+      --widget-color: #232a36;
+      --hover-color: #2e3848;
+      --focus-color: #3a4659;
+      --number-color: #00f2ff;
+      --string-color: #f3d286;
+      --font-size: 12px;
+      border: 1px solid rgba(200, 155, 60, 0.45);
+      border-radius: 4px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(8px);
+    }
+
+    .lil-gui .title {
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      font-weight: 700;
+      border-bottom: 1px solid rgba(200, 155, 60, 0.35);
+    }
+  </style>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.162.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.162.0/examples/jsm/",
+      "lil-gui": "https://cdn.jsdelivr.net/npm/lil-gui@0.19.2/dist/lil-gui.esm.min.js"
+    }
+  }
+  </script>
+</head>
+<body>
+  <div id="canvas-container"></div>
+
+  <div id="hud-overlay">
+    <div class="hud-title">
+      <span>Aether-Apis Mk.IV</span>
+      <span class="status-dot" id="hud-dot"></span>
+    </div>
+    <div class="hud-subtitle">Chronometric Hymenoptera Automaton</div>
+    <div class="hud-grid">
+      <span class="hud-label">OPERATING STATE:</span>
+      <span class="hud-value amber" id="hud-state">FLIGHT</span>
+      <span class="hud-label">WING OSCILLATION:</span>
+      <span class="hud-value" id="hud-flap">32.0 Hz</span>
+      <span class="hud-label">ESCAPEMENT ARBOR:</span>
+      <span class="hud-value" id="hud-rpm">120.0 RPM</span>
+      <span class="hud-label">AETHER CORE FLUX:</span>
+      <span class="hud-value amber" id="hud-flux">98.4 %</span>
+      <span class="hud-label">CAD EXPLODE RATIO:</span>
+      <span class="hud-value cyan" id="hud-explode">0.0 % (RADIAL)</span>
+    </div>
+  </div>
+
+  <div id="controls-hint">
+    LMB: Orbit Camera &nbsp;|&nbsp; RMB: Pan &nbsp;|&nbsp; Scroll: Dolly Zoom &nbsp;|&nbsp; Use GUI Panel for Exploded CAD &amp; Kinematics
+  </div>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+    import GUI from 'lil-gui';
+
+    /**
+     * ============================================================================
+     * 1. PROCEDURAL TEXTURE & MATERIAL FACTORY
+     * Generates all surface textures (brass, oxidized copper, blued steel,
+     * compound eye ommatidia, iridescent wing venation, and glowing core)
+     * strictly in memory via HTML5 2D Canvas.
+     * ============================================================================
+     */
+    class ProceduralMaterialLibrary {
+      constructor(maxAnisotropy = 8) {
+        this.m_MaxAnisotropy = maxAnisotropy;
+        this.m_Textures = {};
+        this.m_Materials = {};
+        this.m_AllMeshMaterials = [];
+
+        this.m_GenerateAllTextures();
+        this.m_CreateAllMaterials();
+      }
+
+      getMaterials() {
+        return this.m_Materials;
+      }
+
+      setWireframe(enabled) {
+        for (let i = 0; i < this.m_AllMeshMaterials.length; i++) {
+          this.m_AllMeshMaterials[i].wireframe = enabled;
+        }
+      }
+
+      m_RegisterMaterial(key, material) {
+        this.m_Materials[key] = material;
+        this.m_AllMeshMaterials.push(material);
+        return material;
+      }
+
+      m_ConfigureTexture(canvas, repeatX = 1, repeatY = 1, isColor = false) {
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.wrapS = THREE.RepeatWrapping;
+        texture.wrapT = THREE.RepeatWrapping;
+        texture.repeat.set(repeatX, repeatY);
+        texture.anisotropy = this.m_MaxAnisotropy;
+        if (isColor) {
+          texture.colorSpace = THREE.SRGBColorSpace;
+        }
+        texture.needsUpdate = true;
+        return texture;
+      }
+
+      m_GenerateAllTextures() {
+        this.m_Textures.brushedMetal = this.m_CreateBrushedMetalMaps();
+        this.m_Textures.oxidizedCopper = this.m_CreateOxidizedCopperMaps();
+        this.m_Textures.bluedSteel = this.m_CreateBluedSteelMaps();
+        this.m_Textures.compoundEye = this.m_CreateCompoundEyeMaps();
+        this.m_Textures.wingMembrane = this.m_CreateWingMembraneMaps();
+        this.m_Textures.powerCore = this.m_CreatePowerCoreMaps();
+        this.m_Textures.studioFloor = this.m_CreateCalibrationFloorMap();
+      }
+
+      m_CreateBrushedMetalMaps() {
+        const size = 512;
+        const colorCanvas = document.createElement('canvas');
+        const roughCanvas = document.createElement('canvas');
+        const bumpCanvas = document.createElement('canvas');
+        colorCanvas.width = roughCanvas.width = bumpCanvas.width = size;
+        colorCanvas.height = roughCanvas.height = bumpCanvas.height = size;
+
+        const cCtx = colorCanvas.getContext('2d');
+        const rCtx = roughCanvas.getContext('2d');
+        const bCtx = bumpCanvas.getContext('2d');
+
+        // Base warm antique brass
+        cCtx.fillStyle = '#d4a243';
+        cCtx.fillRect(0, 0, size, size);
+
+        rCtx.fillStyle = '#484848';
+        rCtx.fillRect(0, 0, size, size);
+
+        bCtx.fillStyle = '#808080';
+        bCtx.fillRect(0, 0, size, size);
+
+        // Directional fine brushed lathe lines
+        for (let i = 0; i < 4000; i++) {
+          const x = Math.random() * size;
+          const y = Math.random() * size;
+          const len = 18 + Math.random() * 75;
+          const lum = Math.floor((Math.random() - 0.5) * 32);
+
+          cCtx.strokeStyle = lum > 0 ? `rgba(255, 232, 175, ${0.06})` : `rgba(95, 65, 18, ${0.08})`;
+          cCtx.lineWidth = 1;
+          cCtx.beginPath();
+          cCtx.moveTo(x, y);
+          cCtx.lineTo((x + len) % size, y);
+          cCtx.stroke();
+
+          const rVal = Math.max(20, Math.min(210, 68 + lum * 1.4));
+          rCtx.strokeStyle = `rgb(${rVal},${rVal},${rVal})`;
+          rCtx.beginPath();
+          rCtx.moveTo(x, y);
+          rCtx.lineTo((x + len) % size, y);
+          rCtx.stroke();
+
+          const bVal = Math.max(40, Math.min(220, 128 + lum));
+          bCtx.strokeStyle = `rgb(${bVal},${bVal},${bVal})`;
+          bCtx.beginPath();
+          bCtx.moveTo(x, y);
+          bCtx.lineTo((x + len) % size, y);
+          bCtx.stroke();
+        }
+
+        // Subtle watchmaker concentric & filigree rings in bump/roughness
+        bCtx.strokeStyle = 'rgba(60, 60, 60, 0.35)';
+        rCtx.strokeStyle = 'rgba(130, 130, 130, 0.25)';
+        for (let r = 24; r < size; r += 32) {
+          bCtx.lineWidth = 1.5;
+          bCtx.beginPath();
+          bCtx.arc(size * 0.5, size * 0.5, r, 0, Math.PI * 2);
+          bCtx.stroke();
+
+          rCtx.lineWidth = 2;
+          rCtx.beginPath();
+          rCtx.arc(size * 0.5, size * 0.5, r, 0, Math.PI * 2);
+          rCtx.stroke();
+        }
+
+        return {
+          map: this.m_ConfigureTexture(colorCanvas, 2, 2, true),
+          roughnessMap: this.m_ConfigureTexture(roughCanvas, 2, 2, false),
+          bumpMap: this.m_ConfigureTexture(bumpCanvas, 2, 2, false)
+        };
+      }
+
+      m_CreateOxidizedCopperMaps() {
+        const size = 512;
+        const colorCanvas = document.createElement('canvas');
+        const roughCanvas = document.createElement('canvas');
+        const bumpCanvas = document.createElement('canvas');
+        colorCanvas.width = roughCanvas.width = bumpCanvas.width = size;
+        colorCanvas.height = roughCanvas.height = bumpCanvas.height = size;
+
+        const cCtx = colorCanvas.getContext('2d');
+        const rCtx = roughCanvas.getContext('2d');
+        const bCtx = bumpCanvas.getContext('2d');
+
+        // Forged copper base
+        cCtx.fillStyle = '#b65d38';
+        cCtx.fillRect(0, 0, size, size);
+
+        rCtx.fillStyle = '#5a5a5a';
+        rCtx.fillRect(0, 0, size, size);
+
+        bCtx.fillStyle = '#808080';
+        bCtx.fillRect(0, 0, size, size);
+
+        // Hammered copper dimples and dark patina
+        for (let i = 0; i < 950; i++) {
+          const x = Math.random() * size;
+          const y = Math.random() * size;
+          const rad = 4 + Math.random() * 24;
+
+          const isVerdigris = Math.random() < 0.28;
+          if (isVerdigris) {
+            const grad = cCtx.createRadialGradient(x, y, 1, x, y, rad);
+            grad.addColorStop(0, 'rgba(62, 152, 132, 0.55)');
+            grad.addColorStop(0.6, 'rgba(48, 120, 102, 0.28)');
+            grad.addColorStop(1, 'rgba(182, 93, 56, 0)');
+            cCtx.fillStyle = grad;
+            cCtx.beginPath();
+            cCtx.arc(x, y, rad, 0, Math.PI * 2);
+            cCtx.fill();
+
+            // Verdigris is matte (higher roughness)
+            rCtx.fillStyle = 'rgba(205, 205, 205, 0.35)';
+            rCtx.beginPath();
+            rCtx.arc(x, y, rad * 0.8, 0, Math.PI * 2);
+            rCtx.fill();
+          } else {
+            const dark = Math.random() < 0.5;
+            cCtx.fillStyle = dark ? 'rgba(92, 38, 22, 0.22)' : 'rgba(218, 125, 84, 0.18)';
+            cCtx.beginPath();
+            cCtx.arc(x, y, rad, 0, Math.PI * 2);
+            cCtx.fill();
+          }
+
+          const bGrad = bCtx.createRadialGradient(x, y, 1, x, y, rad);
+          bGrad.addColorStop(0, 'rgba(95, 95, 95, 0.35)');
+          bGrad.addColorStop(1, 'rgba(128, 128, 128, 0)');
+          bCtx.fillStyle = bGrad;
+          bCtx.beginPath();
+          bCtx.arc(x, y, rad, 0, Math.PI * 2);
+          bCtx.fill();
+        }
+
+        return {
+          map: this.m_ConfigureTexture(colorCanvas, 2, 2, true),
+          roughnessMap: this.m_ConfigureTexture(roughCanvas, 2, 2, false),
+          bumpMap: this.m_ConfigureTexture(bumpCanvas, 2, 2, false)
+        };
+      }
+
+      m_CreateBluedSteelMaps() {
+        const size = 512;
+        const colorCanvas = document.createElement('canvas');
+        const roughCanvas = document.createElement('canvas');
+        colorCanvas.width = roughCanvas.width = size;
+        colorCanvas.height = roughCanvas.height = size;
+
+        const cCtx = colorCanvas.getContext('2d');
+        const rCtx = roughCanvas.getContext('2d');
+
+        const grad = cCtx.createLinearGradient(0, 0, size, size);
+        grad.addColorStop(0, '#1d2b44');
+        grad.addColorStop(0.5, '#273a5a');
+        grad.addColorStop(1, '#162033');
+        cCtx.fillStyle = grad;
+        cCtx.fillRect(0, 0, size, size);
+
+        rCtx.fillStyle = '#404040';
+        rCtx.fillRect(0, 0, size, size);
+
+        for (let i = 0; i < 2500; i++) {
+          const x = Math.random() * size;
+          const y = Math.random() * size;
+          const len = 15 + Math.random() * 50;
+          cCtx.strokeStyle = Math.random() > 0.5
+            ? 'rgba(75, 115, 175, 0.08)'
+            : 'rgba(12, 18, 28, 0.12)';
+          cCtx.beginPath();
+          cCtx.moveTo(x, y);
+          cCtx.lineTo(x + len, y + (Math.random() - 0.5) * 4);
+          cCtx.stroke();
+
+          rCtx.strokeStyle = Math.random() > 0.5
+            ? 'rgba(90, 90, 90, 0.15)'
+            : 'rgba(45, 45, 45, 0.15)';
+          rCtx.beginPath();
+          rCtx.moveTo(x, y);
+          rCtx.lineTo(x + len, y);
+          rCtx.stroke();
+        }
+
+        return {
+          map: this.m_ConfigureTexture(colorCanvas, 2, 2, true),
+          roughnessMap: this.m_ConfigureTexture(roughCanvas, 2, 2, false)
+        };
+      }
+
+      m_CreateCompoundEyeMaps() {
+        const size = 512;
+        const bumpCanvas = document.createElement('canvas');
+        const colorCanvas = document.createElement('canvas');
+        bumpCanvas.width = colorCanvas.width = size;
+        bumpCanvas.height = colorCanvas.height = size;
+
+        const bCtx = bumpCanvas.getContext('2d');
+        const cCtx = colorCanvas.getContext('2d');
+
+        bCtx.fillStyle = '#202020';
+        bCtx.fillRect(0, 0, size, size);
+
+        cCtx.fillStyle = '#ff9915';
+        cCtx.fillRect(0, 0, size, size);
+
+        // Hexagonal ommatidia array
+        const hexRadius = 12;
+        const hexHeight = Math.sqrt(3) * hexRadius;
+        const horizDist = 1.5 * hexRadius;
+
+        for (let row = -2; row < size / hexHeight + 2; row++) {
+          for (let col = -2; col < size / horizDist + 2; col++) {
+            const cx = col * horizDist;
+            const cy = row * hexHeight + (col % 2 !== 0 ? hexHeight * 0.5 : 0);
+
+            const bGrad = bCtx.createRadialGradient(cx, cy, 1, cx, cy, hexRadius * 0.95);
+            bGrad.addColorStop(0, '#ffffff');
+            bGrad.addColorStop(0.7, '#b0b0b0');
+            bGrad.addColorStop(1, '#181818');
+
+            bCtx.fillStyle = bGrad;
+            bCtx.beginPath();
+            for (let s = 0; s < 6; s++) {
+              const angle = (Math.PI / 3) * s;
+              const hx = cx + hexRadius * 0.92 * Math.cos(angle);
+              const hy = cy + hexRadius * 0.92 * Math.sin(angle);
+              if (s === 0) bCtx.moveTo(hx, hy);
+              else bCtx.lineTo(hx, hy);
+            }
+            bCtx.closePath();
+            bCtx.fill();
+
+            const cGrad = cCtx.createRadialGradient(cx, cy, 1, cx, cy, hexRadius);
+            cGrad.addColorStop(0, '#ffbb33');
+            cGrad.addColorStop(0.8, '#e67300');
+            cGrad.addColorStop(1, '#7a2900');
+            cCtx.fillStyle = cGrad;
+            cCtx.beginPath();
+            cCtx.arc(cx, cy, hexRadius * 0.9, 0, Math.PI * 2);
+            cCtx.fill();
+          }
+        }
+
+        return {
+          map: this.m_ConfigureTexture(colorCanvas, 2, 2, true),
+          bumpMap: this.m_ConfigureTexture(bumpCanvas, 2, 2, false)
+        };
+      }
+
+      m_CreateWingMembraneMaps() {
+        const size = 1024;
+        const colorCanvas = document.createElement('canvas');
+        const bumpCanvas = document.createElement('canvas');
+        const alphaCanvas = document.createElement('canvas');
+        colorCanvas.width = bumpCanvas.width = alphaCanvas.width = size;
+        colorCanvas.height = bumpCanvas.height = alphaCanvas.height = size;
+
+        const cCtx = colorCanvas.getContext('2d');
+        const bCtx = bumpCanvas.getContext('2d');
+        const aCtx = alphaCanvas.getContext('2d');
+
+        // Iridescent golden-cyan base membrane
+        const cGrad = cCtx.createLinearGradient(0, 0, size, size);
+        cGrad.addColorStop(0, '#ffe8b8');
+        cGrad.addColorStop(0.35, '#a8f0ff');
+        cGrad.addColorStop(0.7, '#f5c2ff');
+        cGrad.addColorStop(1, '#ffd280');
+        cCtx.fillStyle = cGrad;
+        cCtx.fillRect(0, 0, size, size);
+
+        bCtx.fillStyle = '#707070';
+        bCtx.fillRect(0, 0, size, size);
+
+        aCtx.fillStyle = '#c8c8c8';
+        aCtx.fillRect(0, 0, size, size);
+
+        // Micro-cellular hexagonal membrane network
+        const cellStep = 24;
+        cCtx.strokeStyle = 'rgba(212, 162, 67, 0.35)';
+        bCtx.strokeStyle = '#d8d8d8';
+        aCtx.strokeStyle = '#ffffff';
+        cCtx.lineWidth = 1.2;
+        bCtx.lineWidth = 1.5;
+        aCtx.lineWidth = 1.2;
+
+        for (let y = 0; y < size + cellStep; y += cellStep) {
+          for (let x = 0; x < size + cellStep; x += cellStep) {
+            const ox = x + ((y / cellStep) % 2 === 0 ? 0 : cellStep * 0.5);
+            const oy = y;
+            cCtx.beginPath();
+            cCtx.arc(ox, oy, cellStep * 0.48, 0, Math.PI * 2);
+            cCtx.stroke();
+
+            bCtx.beginPath();
+            bCtx.arc(ox, oy, cellStep * 0.48, 0, Math.PI * 2);
+            bCtx.stroke();
+          }
+        }
+
+        // Clockwork filigree blueprint lines etched into wing membrane
+        cCtx.strokeStyle = 'rgba(240, 195, 95, 0.65)';
+        bCtx.strokeStyle = '#ffffff';
+        cCtx.lineWidth = 3;
+        bCtx.lineWidth = 4;
+
+        for (let i = 1; i <= 7; i++) {
+          cCtx.beginPath();
+          cCtx.moveTo(0, i * 35);
+          cCtx.quadraticCurveTo(size * 0.5, i * 65, size, i * 135);
+          cCtx.stroke();
+
+          bCtx.beginPath();
+          bCtx.moveTo(0, i * 35);
+          bCtx.quadraticCurveTo(size * 0.5, i * 65, size, i * 135);
+          bCtx.stroke();
+        }
+
+        return {
+          map: this.m_ConfigureTexture(colorCanvas, 1, 1, true),
+          bumpMap: this.m_ConfigureTexture(bumpCanvas, 1, 1, false),
+          alphaMap: this.m_ConfigureTexture(alphaCanvas, 1, 1, false)
+        };
+      }
+
+      m_CreatePowerCoreMaps() {
+        const size = 512;
+        const canvas = document.createElement('canvas');
+        canvas.width = canvas.height = size;
+        const ctx = canvas.getContext('2d');
+
+        const grad = ctx.createRadialGradient(size * 0.5, size * 0.5, 10, size * 0.5, size * 0.5, size * 0.5);
+        grad.addColorStop(0, '#ffffff');
+        grad.addColorStop(0.3, '#ffdd55');
+        grad.addColorStop(0.7, '#ff7700');
+        grad.addColorStop(1, '#551800');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, size, size);
+
+        // Energy harmonic bands
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 4;
+        for (let y = 16; y < size; y += 32) {
+          ctx.beginPath();
+          ctx.moveTo(0, y);
+          ctx.lineTo(size, y);
+          ctx.stroke();
+        }
+
+        return {
+          emissiveMap: this.m_ConfigureTexture(canvas, 1, 2, true)
+        };
+      }
+
+      m_CreateCalibrationFloorMap() {
+        const size = 1024;
+        const canvas = document.createElement('canvas');
+        canvas.width = canvas.height = size;
+        const ctx = canvas.getContext('2d');
+
+        ctx.fillStyle = '#090c12';
+        ctx.fillRect(0, 0, size, size);
+
+        const cx = size * 0.5;
+        const cy = size * 0.5;
+
+        ctx.strokeStyle = 'rgba(200, 155, 60, 0.22)';
+        ctx.lineWidth = 1.5;
+
+        const radii = [90, 180, 270, 360, 440, 480];
+        for (let i = 0; i < radii.length; i++) {
+          ctx.beginPath();
+          ctx.arc(cx, cy, radii[i], 0, Math.PI * 2);
+          ctx.stroke();
+        }
+
+        // Degree ticks
+        for (let deg = 0; deg < 360; deg += 5) {
+          const rad = (deg * Math.PI) / 180;
+          const rInner = deg % 30 === 0 ? 415 : 430;
+          const rOuter = 440;
+          ctx.strokeStyle = deg % 30 === 0
+            ? 'rgba(0, 242, 255, 0.35)'
+            : 'rgba(200, 155, 60, 0.18)';
+          ctx.beginPath();
+          ctx.moveTo(cx + Math.cos(rad) * rInner, cy + Math.sin(rad) * rInner);
+          ctx.lineTo(cx + Math.cos(rad) * rOuter, cy + Math.sin(rad) * rOuter);
+          ctx.stroke();
+        }
+
+        // Crosshairs
+        ctx.strokeStyle = 'rgba(200, 155, 60, 0.15)';
+        ctx.beginPath();
+        ctx.moveTo(cx - 480, cy);
+        ctx.lineTo(cx + 480, cy);
+        ctx.moveTo(cx, cy - 480);
+        ctx.lineTo(cx, cy + 480);
+        ctx.stroke();
+
+        return this.m_ConfigureTexture(canvas, 1, 1, true);
+      }
+
+      m_CreateAllMaterials() {
+        const brassTex = this.m_Textures.brushedMetal;
+        const copperTex = this.m_Textures.oxidizedCopper;
+        const steelTex = this.m_Textures.bluedSteel;
+        const eyeTex = this.m_Textures.compoundEye;
+        const wingTex = this.m_Textures.wingMembrane;
+        const coreTex = this.m_Textures.powerCore;
+
+        // 1. Polished Watchmaker Brass
+        this.m_RegisterMaterial('polishedBrass', new THREE.MeshStandardMaterial({
+          color: new THREE.Color('#f0c265'),
+          map: brassTex.map,
+          roughnessMap: brassTex.roughnessMap,
+          bumpMap: brassTex.bumpMap,
+          bumpScale: 0.004,
+          metalness: 0.94,
+          roughness: 0.22,
+          envMapIntensity: 1.4
+        }));
+
+        // 2. Aged Satin Brass (Structural plates & gear bodies)
+        this.m_RegisterMaterial('agedBrass', new THREE.MeshStandardMaterial({
+          color: new THREE.Color('#c8963e'),
+          map: brassTex.map,
+          roughnessMap: brassTex.roughnessMap,
+          bumpMap: brassTex.bumpMap,
+          bumpScale: 0.008,
+          metalness: 0.88,
+          roughness: 0.36,
+          envMapIntensity: 1.15
+        }));
+
+        // 3. Dark Antique Bronze / Cast Brass
+        this.m_RegisterMaterial('darkBronze', new THREE.MeshStandardMaterial({
+          color: new THREE.Color('#7c5826'),
+          map: brassTex.map,
+          roughnessMap: brassTex.roughnessMap,
+          bumpMap: brassTex.bumpMap,
+          bumpScale: 0.01,
+          metalness: 0.85,
+          roughness: 0.45,
+          envMapIntensity: 1.0
+        }));
+
+        // 4. Oxidized Copper with Verdigris Patina
+        this.m_RegisterMaterial('oxidizedCopper', new THREE.MeshStandardMaterial({
+          color: new THREE.Color('#d97952'),
+          map: copperTex.map,
+          roughnessMap: copperTex.roughnessMap,
+          bumpMap: copperTex.bumpMap,
+          bumpScale: 0.012,
+          metalness: 0.82,
+          roughness: 0.38,
+          envMapIntensity: 1.2
+        }));
+
+        // 5. Heat-Blued Clockwork Steel
+        this.m_RegisterMaterial('bluedSteel', new THREE.MeshStandardMaterial({
+          color: new THREE.Color('#2c446b'),
+          map: steelTex.map,
+          roughnessMap: steelTex.roughnessMap,
+          bumpMap: brassTex.bumpMap,
+          bumpScale: 0.005,
+          metalness: 0.92,
+          roughness: 0.25,
+          envMapIntensity: 1.35
+        }));
+
+        // 6. Dark Gunmetal Steel (Shafts, pins, claws)
+        this.m_RegisterMaterial('gunmetalSteel', new THREE.MeshStandardMaterial({
+          color: new THREE.Color('#1c222b'),
+          roughnessMap: steelTex.roughnessMap,
+          metalness: 0.9,
+          roughness: 0.32,
+          envMapIntensity: 1.1
+        }));
+
+        // 7. Amber Compound Eye Glass
+        this.m_RegisterMaterial('amberGlass', new THREE.MeshPhysicalMaterial({
+          color: new THREE.Color('#ffaa22'),
+          map: eyeTex.map,
+          bumpMap: eyeTex.bumpMap,
+          bumpScale: 0.018,
+          metalness: 0.05,
+          roughness: 0.08,
+          transmission: 0.86,
+          ior: 1.56,
+          thickness: 0.65,
+          attenuationColor: new THREE.Color('#c84400'),
+          attenuationDistance: 0.45,
+          clearcoat: 1.0,
+          clearcoatRoughness: 0.06,
+          emissive: new THREE.Color('#ff6a00'),
+          emissiveIntensity: 0.35,
+          envMapIntensity: 1.8
+        }));
+
+        // 8. Clear Amber Containment Tube Glass
+        this.m_RegisterMaterial('containmentGlass', new THREE.MeshPhysicalMaterial({
+          color: new THREE.Color('#ffcc77'),
+          metalness: 0.0,
+          roughness: 0.06,
+          transmission: 0.92,
+          transparent: true,
+          opacity: 0.95,
+          ior: 1.52,
+          thickness: 0.35,
+          attenuationColor: new THREE.Color('#ff8800'),
+          attenuationDistance: 0.8,
+          clearcoat: 1.0,
+          clearcoatRoughness: 0.05,
+          envMapIntensity: 1.6
+        }));
+
+        // 9. Iridescent Mechanical Wing Membrane
+        this.m_RegisterMaterial('wingMembrane', new THREE.MeshPhysicalMaterial({
+          color: new THREE.Color('#fff5dd'),
+          map: wingTex.map,
+          bumpMap: wingTex.bumpMap,
+          bumpScale: 0.008,
+          alphaMap: wingTex.alphaMap,
+          transparent: true,
+          opacity: 0.86,
+          transmission: 0.68,
+          ior: 1.42,
+          thickness: 0.08,
+          roughness: 0.16,
+          metalness: 0.12,
+          iridescence: 1.0,
+          iridescenceIOR: 1.38,
+          iridescenceThicknessRange: [140, 520],
+          clearcoat: 0.85,
+          clearcoatRoughness: 0.12,
+          side: THREE.DoubleSide,
+          depthWrite: false
+        }));
+
+        // 10. Glowing Aether Power Core
+        this.m_RegisterMaterial('powerCore', new THREE.MeshStandardMaterial({
+          color: new THREE.Color('#ffaa22'),
+          emissive: new THREE.Color('#ff8800'),
+          emissiveMap: coreTex.emissiveMap,
+          emissiveIntensity: 3.2,
+          roughness: 0.15,
+          metalness: 0.1
+        }));
+
+        // 11. Cyan Accent Gauge / Optic Reticle
+        this.m_RegisterMaterial('cyanOptic', new THREE.MeshStandardMaterial({
+          color: new THREE.Color('#00f2ff'),
+          emissive: new THREE.Color('#00d8ff'),
+          emissiveIntensity: 2.2,
+          roughness: 0.2,
+          metalness: 0.2
+        }));
+
+        // 12. Studio Calibration Turntable Floor
+        this.m_Materials.studioFloor = new THREE.MeshStandardMaterial({
+          color: new THREE.Color('#ffffff'),
+          map: this.m_Textures.studioFloor,
+          roughness: 0.75,
+          metalness: 0.25,
+          transparent: true,
+          opacity: 0.88
+        });
+      }
+    }
+
+    /**
+     * ============================================================================
+     * 2. PROCEDURAL MECHANICAL GEOMETRY FACTORY
+     * Builds precision involute gears, helical springs, curved wing frames,
+     * riveted armor shells, and spiral stingers.
+     * ============================================================================
+     */
+    class ProceduralGeometryFactory {
+      /**
+       * Creates an involute-style clockwork gear with spoked cutouts and center bore.
+       */
+      static createGearGeometry(teethCount, moduleSize = 0.022, thickness = 0.04, spokeCount = 5) {
+        const pitchRadius = (teethCount * moduleSize) * 0.5;
+        const addendum = moduleSize * 0.95;
+        const dedendum = moduleSize * 1.15;
+        const outerRadius = pitchRadius + addendum;
+        const rootRadius = Math.max(0.03, pitchRadius - dedendum);
+
+        const shape = new THREE.Shape();
+        const stepAngle = (Math.PI * 2) / teethCount;
+
+        for (let i = 0; i < teethCount; i++) {
+          const baseAngle = i * stepAngle;
+          const a0 = baseAngle - stepAngle * 0.36;
+          const a1 = baseAngle - stepAngle * 0.22;
+          const a2 = baseAngle - stepAngle * 0.11;
+          const a3 = baseAngle + stepAngle * 0.11;
+          const a4 = baseAngle + stepAngle * 0.22;
+          const a5 = baseAngle + stepAngle * 0.36;
+
+          const p0x = Math.cos(a0) * rootRadius;
+          const p0y = Math.sin(a0) * rootRadius;
+          if (i === 0) {
+            shape.moveTo(p0x, p0y);
+          } else {
+            shape.lineTo(p0x, p0y);
+          }
+
+          shape.lineTo(Math.cos(a1) * pitchRadius, Math.sin(a1) * pitchRadius);
+          shape.lineTo(Math.cos(a2) * outerRadius, Math.sin(a2) * outerRadius);
+          shape.lineTo(Math.cos(a3) * outerRadius, Math.sin(a3) * outerRadius);
+          shape.lineTo(Math.cos(a4) * pitchRadius, Math.sin(a4) * pitchRadius);
+          shape.lineTo(Math.cos(a5) * rootRadius, Math.sin(a5) * rootRadius);
+        }
+        shape.closePath();
+
+        // Center arbor hole
+        const boreRadius = Math.min(rootRadius * 0.32, 0.045);
+        const boreHole = new THREE.Path();
+        boreHole.absarc(0, 0, boreRadius, 0, Math.PI * 2, true);
+        shape.holes.push(boreHole);
+
+        // Decorative watchmaker weight-reduction cutouts if gear is large enough
+        if (rootRadius > 0.13 && spokeCount > 0) {
+          const innerRim = boreRadius + 0.035;
+          const outerRim = rootRadius - 0.035;
+          if (outerRim > innerRim + 0.025) {
+            const holeRadius = (outerRim - innerRim) * 0.42;
+            const holeRingRadius = (innerRim + outerRim) * 0.5;
+            for (let s = 0; s < spokeCount; s++) {
+              const sAngle = (s * Math.PI * 2) / spokeCount;
+              const cutout = new THREE.Path();
+              cutout.absarc(
+                Math.cos(sAngle) * holeRingRadius,
+                Math.sin(sAngle) * holeRingRadius,
+                holeRadius,
+                0,
+                Math.PI * 2,
+                true
+              );
+              shape.holes.push(cutout);
+            }
+          }
+        }
+
+        const extrudeSettings = {
+          depth: thickness,
+          bevelEnabled: true,
+          bevelSegments: 2,
+          steps: 1,
+          bevelSize: Math.min(0.005, thickness * 0.14),
+          bevelThickness: Math.min(0.005, thickness * 0.14)
+        };
+
+        const geometry = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+        geometry.center();
+        // Rotate so gear lies in XZ plane with rotation axis along Y by default
+        geometry.rotateX(Math.PI * 0.5);
+        return geometry;
+      }
+
+      /**
+       * Creates a 3D coiled helical spring geometry along a curved or straight spine.
+       */
+      static createHelicalSpringGeometry(length = 0.6, radius = 0.04, turns = 14, wireRadius = 0.008, bendAmount = 0.15) {
+        class HelicalCurve extends THREE.Curve {
+          getPoint(t, optionalTarget = new THREE.Vector3()) {
+            const angle = t * turns * Math.PI * 2;
+            const taper = 1.0 - 0.25 * t;
+            const r = radius * taper;
+            const spineY = t * length;
+            const spineZ = Math.sin(t * Math.PI * 0.85) * bendAmount * t;
+
+            const x = Math.cos(angle) * r;
+            const y = spineY + Math.sin(angle) * r * 0.2;
+            const z = spineZ + Math.sin(angle) * r;
+            return optionalTarget.set(x, y, z);
+          }
+        }
+
+        const curve = new HelicalCurve();
+        return new THREE.TubeGeometry(curve, Math.floor(turns * 14), wireRadius, 8, false);
+      }
+
+      /**
+       * Creates a flat watchmaker hairspring spiral for the balance wheel.
+       */
+      static createHairspringGeometry(innerRadius = 0.02, outerRadius = 0.12, turns = 4.5, wireRadius = 0.0035) {
+        class SpiralCurve extends THREE.Curve {
+          getPoint(t, optionalTarget = new THREE.Vector3()) {
+            const angle = t * turns * Math.PI * 2;
+            const r = THREE.MathUtils.lerp(innerRadius, outerRadius, t);
+            return optionalTarget.set(Math.cos(angle) * r, 0, Math.sin(angle) * r);
+          }
+        }
+        return new THREE.TubeGeometry(new SpiralCurve(), 110, wireRadius, 6, false);
+      }
+
+      /**
+       * Creates a complete mechanical wing (leading spar, branching brass veins,
+       * articulated root housing, and iridescent translucent membrane).
+       */
+      static createMechanicalWing(scale = 1.0, isRight = false, materials) {
+        const wingGroup = new THREE.Group();
+        const mirrorSign = isRight ? 1 : -1;
+
+        // 1. Articulated Wing Root Hinge & Scapula Cylinder
+        const hingeGroup = new THREE.Group();
+        const rootCylinder = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.055 * scale, 0.055 * scale, 0.14 * scale, 16),
+          materials.agedBrass
+        );
+        rootCylinder.rotation.z = Math.PI * 0.5;
+        rootCylinder.castShadow = true;
+        hingeGroup.add(rootCylinder);
+
+        const clevisPin = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.025 * scale, 0.025 * scale, 0.18 * scale, 12),
+          materials.bluedSteel
+        );
+        clevisPin.rotation.z = Math.PI * 0.5;
+        hingeGroup.add(clevisPin);
+
+        const knuckleClamp = new THREE.Mesh(
+          new THREE.BoxGeometry(0.14 * scale, 0.06 * scale, 0.11 * scale),
+          materials.polishedBrass
+        );
+        knuckleClamp.position.x = mirrorSign * 0.07 * scale;
+        knuckleClamp.castShadow = true;
+        hingeGroup.add(knuckleClamp);
+
+        wingGroup.add(hingeGroup);
+
+        // 2. Wing Membrane Shape (extends along +X for right wing, -X for left wing)
+        const length = 1.95 * scale;
+        const chord = 0.68 * scale;
+
+        const wingShape = new THREE.Shape();
+        wingShape.moveTo(0, 0);
+        wingShape.bezierCurveTo(
+          length * 0.35, chord * 0.18,
+          length * 0.78, chord * 0.12,
+          length, -chord * 0.08
+        );
+        wingShape.bezierCurveTo(
+          length * 0.92, -chord * 0.58,
+          length * 0.55, -chord * 0.95,
+          length * 0.18, -chord * 0.78
+        );
+        wingShape.quadraticCurveTo(length * 0.05, -chord * 0.45, 0, -chord * 0.08);
+        wingShape.closePath();
+
+        const membraneGeo = new THREE.ShapeGeometry(wingShape, 24);
+        // Normalize UVs to [0, 1]
+        const posAttr = membraneGeo.attributes.position;
+        const uvAttr = membraneGeo.attributes.uv;
+        for (let i = 0; i < posAttr.count; i++) {
+          const vx = posAttr.getX(i);
+          const vy = posAttr.getY(i);
+          // Add slight aerodynamic camber curve in Z
+          const u = vx / length;
+          const v = -vy / chord;
+          const camber = Math.sin(u * Math.PI) * Math.sin(v * Math.PI) * 0.045 * scale;
+          posAttr.setZ(i, camber);
+          uvAttr.setXY(i, u, v);
+        }
+        membraneGeo.computeVertexNormals();
+        // Orient flat in XZ plane (leading edge along X, chord trailing toward -Z)
+        membraneGeo.rotateX(Math.PI * 0.5);
+        if (!isRight) {
+          membraneGeo.scale(-1, 1, 1);
+        }
+
+        const membraneMesh = new THREE.Mesh(membraneGeo, materials.wingMembrane);
+        membraneMesh.castShadow = true;
+        wingGroup.add(membraneMesh);
+
+        // 3. Leading Edge Tapered Brass Spar & Branching Veins
+        const veinDefs = [
+          // Main leading edge costa spar
+          {
+            pts: [
+              new THREE.Vector3(0, 0, 0),
+              new THREE.Vector3(length * 0.42, 0.015 * scale, -chord * 0.11),
+              new THREE.Vector3(length * 0.82, 0.01 * scale, -chord * 0.05),
+              new THREE.Vector3(length, 0, chord * 0.08)
+            ],
+            r: 0.018 * scale,
+            mat: materials.polishedBrass
+          },
+          // Primary radial vein
+          {
+            pts: [
+              new THREE.Vector3(length * 0.08, 0.01 * scale, 0.02 * scale),
+              new THREE.Vector3(length * 0.48, 0.022 * scale, chord * 0.25),
+              new THREE.Vector3(length * 0.86, 0.008 * scale, chord * 0.42)
+            ],
+            r: 0.011 * scale,
+            mat: materials.agedBrass
+          },
+          // Median vein
+          {
+            pts: [
+              new THREE.Vector3(length * 0.28, 0.018 * scale, chord * 0.14),
+              new THREE.Vector3(length * 0.55, 0.02 * scale, chord * 0.52),
+              new THREE.Vector3(length * 0.72, 0.005 * scale, chord * 0.68)
+            ],
+            r: 0.0085 * scale,
+            mat: materials.oxidizedCopper
+          },
+          // Cubital trailing strut
+          {
+            pts: [
+              new THREE.Vector3(length * 0.05, 0.008 * scale, 0.04 * scale),
+              new THREE.Vector3(length * 0.24, 0.014 * scale, chord * 0.46),
+              new THREE.Vector3(length * 0.42, 0.006 * scale, chord * 0.78)
+            ],
+            r: 0.009 * scale,
+            mat: materials.agedBrass
+          },
+          // Cross strut 1
+          {
+            pts: [
+              new THREE.Vector3(length * 0.44, 0.015 * scale, -chord * 0.09),
+              new THREE.Vector3(length * 0.48, 0.02 * scale, chord * 0.25),
+              new THREE.Vector3(length * 0.42, 0.015 * scale, chord * 0.62)
+            ],
+            r: 0.0065 * scale,
+            mat: materials.bluedSteel
+          },
+          // Cross strut 2
+          {
+            pts: [
+              new THREE.Vector3(length * 0.72, 0.012 * scale, -chord * 0.05),
+              new THREE.Vector3(length * 0.75, 0.015 * scale, chord * 0.34)
+            ],
+            r: 0.006 * scale,
+            mat: materials.bluedSteel
+          }
+        ];
+
+        for (let i = 0; i < veinDefs.length; i++) {
+          const def = veinDefs[i];
+          const pts = def.pts.map(p => new THREE.Vector3(p.x * mirrorSign, p.y, p.z));
+          const curve = new THREE.CatmullRomCurve3(pts);
+          const tubeGeo = new THREE.TubeGeometry(curve, 24, def.r, 8, false);
+          const veinMesh = new THREE.Mesh(tubeGeo, def.mat);
+          veinMesh.castShadow = true;
+          wingGroup.add(veinMesh);
+        }
+
+        // Micro-rivet joints at vein intersections
+        const rivetJointCoords = [
+          [0.12, -0.02], [0.44, -0.09], [0.72, -0.05], [0.48, 0.25], [0.24, 0.46]
+        ];
+        const rivetGeo = new THREE.CylinderGeometry(0.014 * scale, 0.014 * scale, 0.032 * scale, 8);
+        for (let i = 0; i < rivetJointCoords.length; i++) {
+          const [rx, rz] = rivetJointCoords[i];
+          const rivet = new THREE.Mesh(rivetGeo, materials.polishedBrass);
+          rivet.position.set(rx * length * mirrorSign, 0.015 * scale, rz * chord);
+          wingGroup.add(rivet);
+        }
+
+        return wingGroup;
+      }
+    }
+
+    /**
+     * ============================================================================
+     * 3. STEAMPUNK MECHANICAL BEE ASSEMBLY
+     * Constructs the full hierarchical automaton, registers all sub-assemblies
+     * for radial/axial CAD exploded view with cyan leader lines, and drives
+     * synchronized delta-time kinematics.
+     * ============================================================================
+     */
+    class SteampunkMechanicalBee {
+      constructor(materials) {
+        this.m_Materials = materials;
+        this.m_RootGroup = new THREE.Group();
+
+        // Sub-assembly references for animation
+        this.m_HeadGroup = null;
+        this.m_LeftAntenna = null;
+        this.m_RightAntenna = null;
+        this.m_LeftMandible = null;
+        this.m_RightMandible = null;
+
+        this.m_Gears = []; // { mesh, ratio, phaseOffset, axis, isOscillating }
+        this.m_Pistons = []; // { mesh, basePos, axis, phaseOffset, stroke }
+        this.m_Wings = []; // { group, isRight, isFore, baseRot, linkageRod }
+        this.m_Legs = []; // { root, coxa, femur, tibia, tarsus, side, index, baseAngles }
+        this.m_AbdomenSegments = [];
+        this.m_CoreGyroRings = [];
+        this.m_PowerCoreMesh = null;
+        this.m_PowerCoreLight = null;
+        this.m_StingerAssembly = null;
+
+        // Exploded view registry & cyan leader lines
+        this.m_ExplodeRegistry = [];
+        this.m_LeaderLineGeometry = null;
+        this.m_LeaderLineSegments = null;
+        this.m_LeaderAnchorDots = null;
+
+        // Continuous phase accumulators (prevents jitter when changing sliders)
+        this.m_WingPhase = 0;
+        this.m_GearPhase = 0;
+        this.m_BodyPhase = 0;
+        this.m_CurrentExplode = 0;
+        this.m_FlightBlend = 1.0;
+
+        this.m_BuildCompleteAutomaton();
+        this.m_BuildCyanLeaderLines();
+      }
+
+      getRootGroup() {
+        return this.m_RootGroup;
+      }
+
+      /**
+       * Registers a 3D object to participate in the Exploded View system
+       * along with its local origin, radial offset vector, and axial offset vector.
+       */
+      m_RegisterExplodePart(object3D, radialVec, axialVec, includeLeaderLine = true) {
+        this.m_ExplodeRegistry.push({
+          object: object3D,
+          basePosition: object3D.position.clone(),
+          radialOffset: radialVec.clone(),
+          axialOffset: axialVec.clone(),
+          includeLeaderLine
+        });
+      }
+
+      m_BuildCompleteAutomaton() {
+        this.m_BuildArticulatedHead();
+        this.m_BuildThoraxAndClockwork();
+        this.m_BuildFourMechanicalWings();
+        this.m_BuildSixSegmentedLegs();
+        this.m_BuildFivePartAbdomenAndCore();
+      }
+
+      /**
+       * --------------------------------------------------------------------------
+       * A. ARTICULATED BRASS HEAD, AMBER COMPOUND EYES & SPRING ANTENNAE
+       * --------------------------------------------------------------------------
+       */
+      m_BuildArticulatedHead() {
+        this.m_HeadGroup = new THREE.Group();
+        this.m_HeadGroup.position.set(0, 0.08, -1.18);
+        this.m_RootGroup.add(this.m_HeadGroup);
+
+        // Register entire head assembly for axial/radial separation
+        this.m_RegisterExplodePart(
+          this.m_HeadGroup,
+          new THREE.Vector3(0, 0.25, -0.85),
+          new THREE.Vector3(0, 0.0, -1.25),
+          true
+        );
+
+        // 1. Neck Gimbal & Flexible Copper Conduit Collar
+        const neckCollar = new THREE.Group();
+        neckCollar.position.set(0, 0.02, 0.34);
+        const gimbalSphere = new THREE.Mesh(
+          new THREE.SphereGeometry(0.22, 20, 16),
+          this.m_Materials.bluedSteel
+        );
+        gimbalSphere.castShadow = true;
+        neckCollar.add(gimbalSphere);
+
+        for (let i = -1; i <= 1; i++) {
+          const bellowRing = new THREE.Mesh(
+            new THREE.TorusGeometry(0.23, 0.025, 10, 24),
+            this.m_Materials.oxidizedCopper
+          );
+          bellowRing.position.z = i * 0.055;
+          neckCollar.add(bellowRing);
+        }
+        this.m_HeadGroup.add(neckCollar);
+        this.m_RegisterExplodePart(
+          neckCollar,
+          new THREE.Vector3(0, -0.25, 0.25),
+          new THREE.Vector3(0, 0, 0.45),
+          true
+        );
+
+        // 2. Main Cranium Core Chassis
+        const craniumCore = new THREE.Mesh(
+          new THREE.SphereGeometry(0.38, 28, 22),
+          this.m_Materials.darkBronze
+        );
+        craniumCore.scale.set(0.95, 0.92, 1.08);
+        craniumCore.castShadow = true;
+        craniumCore.receiveShadow = true;
+        this.m_HeadGroup.add(craniumCore);
+
+        // 3. Dorsal Articulated Brass Brow Shield (with rivets)
+        const browPlateGroup = new THREE.Group();
+        browPlateGroup.position.set(0, 0.14, -0.02);
+        const browShell = new THREE.Mesh(
+          new THREE.SphereGeometry(0.39, 24, 18, 0, Math.PI * 2, 0, Math.PI * 0.52),
+          this.m_Materials.polishedBrass
+        );
+        browShell.scale.set(0.92, 0.78, 1.08);
+        browShell.castShadow = true;
+        browPlateGroup.add(browShell);
+
+        // Median sagittal crest ridge + optical ocelli lenses
+        const crestRidge = new THREE.Mesh(
+          new THREE.BoxGeometry(0.08, 0.12, 0.56),
+          this.m_Materials.agedBrass
+        );
+        crestRidge.position.set(0, 0.24, -0.02);
+        crestRidge.castShadow = true;
+        browPlateGroup.add(crestRidge);
+
+        // Three dorsal ocelli (simple eyes) on the brow crest
+        const ocelliOffsets = [[0, 0.31, -0.16], [-0.08, 0.29, -0.04], [0.08, 0.29, -0.04]];
+        for (let i = 0; i < ocelliOffsets.length; i++) {
+          const [ox, oy, oz] = ocelliOffsets[i];
+          const bezel = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.036, 0.04, 0.03, 12),
+            this.m_Materials.bluedSteel
+          );
+          bezel.position.set(ox, oy, oz);
+          browPlateGroup.add(bezel);
+
+          const jewel = new THREE.Mesh(
+            new THREE.SphereGeometry(0.028, 12, 10),
+            this.m_Materials.cyanOptic
+          );
+          jewel.position.set(ox, oy + 0.015, oz);
+          browPlateGroup.add(jewel);
+        }
+
+        // Rivets along the brow shield edge
+        const rivetGeo = new THREE.SphereGeometry(0.018, 8, 8);
+        for (let a = -2.2; a <= 2.2; a += 0.55) {
+          const rMesh = new THREE.Mesh(rivetGeo, this.m_Materials.bluedSteel);
+          rMesh.position.set(Math.sin(a) * 0.33, 0.06, Math.cos(a) * 0.36);
+          browPlateGroup.add(rMesh);
+        }
+
+        this.m_HeadGroup.add(browPlateGroup);
+        this.m_RegisterExplodePart(
+          browPlateGroup,
+          new THREE.Vector3(0, 0.55, -0.2),
+          new THREE.Vector3(0, 0.42, -0.35),
+          true
+        );
+
+        // 4. Facial Clypeus / Ventral Respirator Grille Plate
+        const clypeusGroup = new THREE.Group();
+        clypeusGroup.position.set(0, -0.08, -0.34);
+        const clypeusPlate = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.18, 0.11, 0.32, 8),
+          this.m_Materials.agedBrass
+        );
+        clypeusPlate.rotation.x = Math.PI * 0.25;
+        clypeusPlate.scale.set(1.1, 1.0, 0.55);
+        clypeusPlate.castShadow = true;
+        clypeusGroup.add(clypeusPlate);
+
+        for (let i = -2; i <= 2; i++) {
+          const louver = new THREE.Mesh(
+            new THREE.BoxGeometry(0.22, 0.016, 0.05),
+            this.m_Materials.bluedSteel
+          );
+          louver.position.set(0, i * 0.042, -0.06 - i * 0.025);
+          louver.rotation.x = 0.4;
+          clypeusGroup.add(louver);
+        }
+        this.m_HeadGroup.add(clypeusGroup);
+        this.m_RegisterExplodePart(
+          clypeusGroup,
+          new THREE.Vector3(0, -0.35, -0.55),
+          new THREE.Vector3(0, -0.2, -0.65),
+          true
+        );
+
+        // 5. Left & Right Amber Compound Eyes in Stepped Brass Bezels
+        for (let side of [-1, 1]) {
+          const eyeAssembly = new THREE.Group();
+          eyeAssembly.position.set(side * 0.32, 0.03, -0.08);
+          eyeAssembly.rotation.y = side * 0.32;
+          eyeAssembly.rotation.z = -side * 0.12;
+
+          // Outer knurled brass bezel housing
+          const bezelRing = new THREE.Mesh(
+            new THREE.TorusGeometry(0.21, 0.036, 14, 28),
+            this.m_Materials.polishedBrass
+          );
+          bezelRing.rotation.y = Math.PI * 0.5;
+          bezelRing.scale.set(1.25, 0.85, 1.0);
+          bezelRing.castShadow = true;
+          eyeAssembly.add(bezelRing);
+
+          const innerBarrel = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.19, 0.17, 0.12, 24),
+            this.m_Materials.bluedSteel
+          );
+          innerBarrel.rotation.z = Math.PI * 0.5;
+          innerBarrel.scale.set(1.0, 1.0, 1.25);
+          eyeAssembly.add(innerBarrel);
+
+          // Glowing internal golden optic reticle behind the compound glass
+          const innerOpticCore = new THREE.Mesh(
+            new THREE.SphereGeometry(0.13, 16, 16),
+            this.m_Materials.powerCore
+          );
+          innerOpticCore.position.x = side * 0.02;
+          innerOpticCore.scale.set(0.5, 1.1, 0.8);
+          eyeAssembly.add(innerOpticCore);
+
+          // Multifaceted Amber Glass Dome
+          const compoundLens = new THREE.Mesh(
+            new THREE.SphereGeometry(0.205, 32, 24),
+            this.m_Materials.amberGlass
+          );
+          compoundLens.position.x = side * 0.04;
+          compoundLens.scale.set(0.68, 1.22, 0.84);
+          compoundLens.castShadow = true;
+          eyeAssembly.add(compoundLens);
+
+          this.m_HeadGroup.add(eyeAssembly);
+          this.m_RegisterExplodePart(
+            eyeAssembly,
+            new THREE.Vector3(side * 0.72, 0.12, -0.15),
+            new THREE.Vector3(side * 0.48, 0.05, -0.45),
+            true
+          );
+        }
+
+        // 6. Articulated Pincer Mandibles & Proboscis Stylus
+        for (let side of [-1, 1]) {
+          const mandiblePivot = new THREE.Group();
+          mandiblePivot.position.set(side * 0.15, -0.22, -0.32);
+
+          const hingePin = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.035, 0.035, 0.09, 12),
+            this.m_Materials.polishedBrass
+          );
+          mandiblePivot.add(hingePin);
+
+          const pincerBlade = new THREE.Mesh(
+            new THREE.ConeGeometry(0.065, 0.28, 6),
+            this.m_Materials.bluedSteel
+          );
+          pincerBlade.position.set(-side * 0.05, -0.08, -0.11);
+          pincerBlade.rotation.x = -Math.PI * 0.38;
+          pincerBlade.rotation.z = side * 0.48;
+          pincerBlade.scale.set(0.65, 1.0, 1.2);
+          pincerBlade.castShadow = true;
+          mandiblePivot.add(pincerBlade);
+
+          this.m_HeadGroup.add(mandiblePivot);
+          if (side === -1) this.m_LeftMandible = mandiblePivot;
+          else this.m_RightMandible = mandiblePivot;
+
+          this.m_RegisterExplodePart(
+            mandiblePivot,
+            new THREE.Vector3(side * 0.42, -0.45, -0.38),
+            new THREE.Vector3(side * 0.25, -0.32, -0.58),
+            true
+          );
+        }
+
+        // 7. Spring Antennae (Ball-socket base + helical spring + articulated flagellum)
+        for (let side of [-1, 1]) {
+          const antennaRoot = new THREE.Group();
+          antennaRoot.position.set(side * 0.14, 0.18, -0.34);
+          antennaRoot.rotation.set(-0.65, side * 0.35, -side * 0.22);
+
+          // Socket collar
+          const socketCollar = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.048, 0.058, 0.07, 14),
+            this.m_Materials.polishedBrass
+          );
+          antennaRoot.add(socketCollar);
+
+          const ballJoint = new THREE.Mesh(
+            new THREE.SphereGeometry(0.042, 14, 14),
+            this.m_Materials.bluedSteel
+          );
+          ballJoint.position.y = 0.04;
+          antennaRoot.add(ballJoint);
+
+          // Coiled helical brass spring scape
+          const springGeo = ProceduralGeometryFactory.createHelicalSpringGeometry(0.46, 0.034, 13, 0.0075, 0.12);
+          const springMesh = new THREE.Mesh(springGeo, this.m_Materials.polishedBrass);
+          springMesh.position.y = 0.05;
+          springMesh.castShadow = true;
+          antennaRoot.add(springMesh);
+
+          // Inner blued-steel tension core wire
+          const coreRod = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.009, 0.012, 0.46, 8),
+            this.m_Materials.bluedSteel
+          );
+          coreRod.position.set(0, 0.28, 0.04);
+          coreRod.rotation.x = 0.18;
+          antennaRoot.add(coreRod);
+
+          // Pedicel elbow coupler & sensory flagellum tip
+          const tipGroup = new THREE.Group();
+          tipGroup.position.set(0, 0.51, 0.12);
+          tipGroup.rotation.x = 0.72;
+          tipGroup.rotation.z = -side * 0.18;
+
+          const elbowJoint = new THREE.Mesh(
+            new THREE.SphereGeometry(0.032, 12, 12),
+            this.m_Materials.oxidizedCopper
+          );
+          tipGroup.add(elbowJoint);
+
+          const distShaft = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.016, 0.024, 0.34, 12),
+            this.m_Materials.bluedSteel
+          );
+          distShaft.position.y = 0.17;
+          distShaft.castShadow = true;
+          tipGroup.add(distShaft);
+
+          // Ring resonators along sensory tip
+          for (let r = 0; r < 4; r++) {
+            const sensorRing = new THREE.Mesh(
+              new THREE.TorusGeometry(0.023 - r * 0.002, 0.005, 8, 16),
+              this.m_Materials.polishedBrass
+            );
+            sensorRing.rotation.x = Math.PI * 0.5;
+            sensorRing.position.y = 0.08 + r * 0.068;
+            tipGroup.add(sensorRing);
+          }
+
+          // Glowing amber sensory bulb at apex
+          const apexBulb = new THREE.Mesh(
+            new THREE.SphereGeometry(0.026, 14, 14),
+            this.m_Materials.amberGlass
+          );
+          apexBulb.position.y = 0.36;
+          apexBulb.scale.set(1, 1.4, 1);
+          tipGroup.add(apexBulb);
+
+          antennaRoot.add(tipGroup);
+          this.m_HeadGroup.add(antennaRoot);
+
+          if (side === -1) this.m_LeftAntenna = { root: antennaRoot, tip: tipGroup, baseRot: antennaRoot.rotation.clone() };
+          else this.m_RightAntenna = { root: antennaRoot, tip: tipGroup, baseRot: antennaRoot.rotation.clone() };
+
+          this.m_RegisterExplodePart(
+            antennaRoot,
+            new THREE.Vector3(side * 0.48, 0.62, -0.58),
+            new THREE.Vector3(side * 0.3, 0.45, -0.82),
+            true
+          );
+        }
+      }
+
+      /**
+       * --------------------------------------------------------------------------
+       * B. THORAX CHASSIS, SPLIT ARMOR COWLS & EXPOSED INTERLOCKING CLOCKWORK
+       * --------------------------------------------------------------------------
+       */
+      m_BuildThoraxAndClockwork() {
+        const thoraxGroup = new THREE.Group();
+        thoraxGroup.position.set(0, 0.12, -0.25);
+        this.m_RootGroup.add(thoraxGroup);
+
+        // 1. Central Structural Gearbox Frame (Blued steel & dark bronze cage)
+        const chassisGroup = new THREE.Group();
+        const lowerSternum = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.52, 0.44, 1.05, 16, 1, false, Math.PI * 0.25, Math.PI * 1.5),
+          this.m_Materials.bluedSteel
+        );
+        lowerSternum.rotation.x = Math.PI * 0.5;
+        lowerSternum.scale.set(1.05, 1.0, 0.78);
+        lowerSternum.castShadow = true;
+        lowerSternum.receiveShadow = true;
+        chassisGroup.add(lowerSternum);
+
+        // Internal twin bridge plates holding gear arbors
+        for (let py of [-0.12, 0.12]) {
+          const bridgePlate = new THREE.Mesh(
+            new THREE.BoxGeometry(0.66, 0.032, 0.92),
+            this.m_Materials.darkBronze
+          );
+          bridgePlate.position.set(0, py, 0);
+          bridgePlate.castShadow = true;
+          chassisGroup.add(bridgePlate);
+        }
+
+        // Four brass structural pillar standoffs
+        const pillarCoords = [[-0.26, -0.38], [0.26, -0.38], [-0.28, 0.36], [0.28, 0.36]];
+        const pillarGeo = new THREE.CylinderGeometry(0.032, 0.032, 0.44, 12);
+        for (let i = 0; i < pillarCoords.length; i++) {
+          const [px, pz] = pillarCoords[i];
+          const pillar = new THREE.Mesh(pillarGeo, this.m_Materials.polishedBrass);
+          pillar.position.set(px, 0.04, pz);
+          chassisGroup.add(pillar);
+        }
+
+        thoraxGroup.add(chassisGroup);
+        this.m_RegisterExplodePart(
+          chassisGroup,
+          new THREE.Vector3(0, -0.38, 0),
+          new THREE.Vector3(0, -0.22, 0),
+          true
+        );
+
+        // 2. Interlocking Clockwork Gear Train
+        // Module size k = 0.0185 ensures exact tooth pitch radius R = N * 0.00925
+        const moduleSize = 0.0185;
+        const rPerTooth = moduleSize * 0.5;
+
+        const addClockworkGear = (config) => {
+          const {
+            teeth,
+            thickness = 0.045,
+            spokes = 5,
+            mat,
+            pos,
+            rot = new THREE.Euler(0, 0, 0),
+            ratio = 1.0,
+            phaseOffset = 0,
+            axis = 'y',
+            isOscillating = false,
+            explodeRadial,
+            explodeAxial
+          } = config;
+
+          const gearAssembly = new THREE.Group();
+          gearAssembly.position.copy(pos);
+          gearAssembly.rotation.copy(rot);
+
+          const gearGeo = ProceduralGeometryFactory.createGearGeometry(teeth, moduleSize, thickness, spokes);
+          const gearMesh = new THREE.Mesh(gearGeo, mat);
+          gearMesh.castShadow = true;
+          gearMesh.receiveShadow = true;
+          gearAssembly.add(gearMesh);
+
+          // Center arbor shaft & brass hub collar
+          const arborMesh = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.026, 0.026, thickness + 0.16, 12),
+            this.m_Materials.bluedSteel
+          );
+          gearAssembly.add(arborMesh);
+
+          const hubCollar = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.052, 0.052, thickness + 0.03, 12),
+            this.m_Materials.polishedBrass
+          );
+          gearAssembly.add(hubCollar);
+
+          thoraxGroup.add(gearAssembly);
+
+          this.m_Gears.push({
+            mesh: gearMesh,
+            ratio,
+            phaseOffset,
+            axis,
+            isOscillating
+          });
+
+          this.m_RegisterExplodePart(
+            gearAssembly,
+            explodeRadial,
+            explodeAxial,
+            true
+          );
+
+          return gearAssembly;
+        };
+
+        // Gear 1: Central Mainspring Drive Wheel (26 teeth)
+        const n1 = 26;
+        const r1 = n1 * rPerTooth; // 0.2405
+        addClockworkGear({
+          teeth: n1,
+          thickness: 0.055,
+          spokes: 6,
+          mat: this.m_Materials.polishedBrass,
+          pos: new THREE.Vector3(0, 0.02, -0.04),
+          ratio: 1.0,
+          phaseOffset: 0,
+          explodeRadial: new THREE.Vector3(0, 0.55, 0),
+          explodeAxial: new THREE.Vector3(0, 0.42, -0.08)
+        });
+
+        // Gear 2: Anterior Pinion + Coaxial Crown Wheel (13 teeth, meshes with Gear 1 along -Z)
+        const n2 = 13;
+        const r2 = n2 * rPerTooth;
+        const d12 = r1 + r2;
+        addClockworkGear({
+          teeth: n2,
+          thickness: 0.06,
+          spokes: 0,
+          mat: this.m_Materials.bluedSteel,
+          pos: new THREE.Vector3(0, 0.02, -0.04 - d12),
+          ratio: -(n1 / n2), // -2.0x speed
+          phaseOffset: Math.PI / n2,
+          explodeRadial: new THREE.Vector3(0, 0.68, -0.35),
+          explodeAxial: new THREE.Vector3(0, 0.35, -0.52)
+        });
+
+        // Gear 3: Posterior Transmission Spur Gear (16 teeth, meshes with Gear 1 along +Z)
+        const n3 = 16;
+        const r3 = n3 * rPerTooth;
+        const d13 = r1 + r3;
+        addClockworkGear({
+          teeth: n3,
+          thickness: 0.05,
+          spokes: 4,
+          mat: this.m_Materials.oxidizedCopper,
+          pos: new THREE.Vector3(0, 0.02, -0.04 + d13),
+          ratio: -(n1 / n3), // -1.625x speed
+          phaseOffset: Math.PI / n3,
+          explodeRadial: new THREE.Vector3(0, 0.65, 0.38),
+          explodeAxial: new THREE.Vector3(0, 0.38, 0.48)
+        });
+
+        // Gears 4 & 5: Left & Right Lateral Wing-Drive Cam Gears (14 teeth, meshing with Gear 1 along +/-X)
+        const n4 = 14;
+        const r4 = n4 * rPerTooth;
+        const d14 = r1 + r4;
+        for (let side of [-1, 1]) {
+          addClockworkGear({
+            teeth: n4,
+            thickness: 0.05,
+            spokes: 4,
+            mat: this.m_Materials.agedBrass,
+            pos: new THREE.Vector3(side * d14, 0.02, -0.04),
+            ratio: -(n1 / n4),
+            phaseOffset: side === 1 ? Math.PI / n4 : 0,
+            explodeRadial: new THREE.Vector3(side * 0.78, 0.35, 0),
+            explodeAxial: new THREE.Vector3(side * 0.55, 0.25, 0)
+          });
+        }
+
+        // Gears 6 & 7: Left & Right Vertical Bevel/Flank Gears Exposed on Thorax Sides (20 teeth)
+        for (let side of [-1, 1]) {
+          addClockworkGear({
+            teeth: 20,
+            thickness: 0.042,
+            spokes: 5,
+            mat: this.m_Materials.polishedBrass,
+            pos: new THREE.Vector3(side * 0.49, 0.06, 0.06),
+            rot: new THREE.Euler(0, 0, Math.PI * 0.5),
+            ratio: side * 1.6,
+            phaseOffset: 0.2,
+            explodeRadial: new THREE.Vector3(side * 0.95, 0.1, 0.06),
+            explodeAxial: new THREE.Vector3(side * 0.68, 0.08, 0.15)
+          });
+
+          // Secondary meshing flank pinion (12 teeth)
+          const flankDist = (20 + 12) * rPerTooth;
+          addClockworkGear({
+            teeth: 12,
+            thickness: 0.045,
+            spokes: 0,
+            mat: this.m_Materials.bluedSteel,
+            pos: new THREE.Vector3(side * 0.49, 0.06, 0.06 - flankDist),
+            rot: new THREE.Euler(0, 0, Math.PI * 0.5),
+            ratio: -side * 1.6 * (20 / 12),
+            phaseOffset: Math.PI / 12,
+            explodeRadial: new THREE.Vector3(side * 1.02, 0.14, -0.25),
+            explodeAxial: new THREE.Vector3(side * 0.72, 0.12, -0.32)
+          });
+        }
+
+        // Gear 8: Dorsal Chronometer Escapement Balance Wheel with Hairspring
+        const escapementGroup = addClockworkGear({
+          teeth: 18,
+          thickness: 0.032,
+          spokes: 3,
+          mat: this.m_Materials.polishedBrass,
+          pos: new THREE.Vector3(0, 0.31, -0.04),
+          ratio: 3.5,
+          phaseOffset: 0,
+          isOscillating: true,
+          explodeRadial: new THREE.Vector3(0, 0.98, -0.04),
+          explodeAxial: new THREE.Vector3(0, 0.78, -0.1)
+        });
+
+        const hairspringMesh = new THREE.Mesh(
+          ProceduralGeometryFactory.createHairspringGeometry(0.025, 0.13, 4.5, 0.0035),
+          this.m_Materials.oxidizedCopper
+        );
+        hairspringMesh.position.y = 0.032;
+        escapementGroup.add(hairspringMesh);
+
+        // Escapement bridge cock
+        const balanceBridge = new THREE.Mesh(
+          new THREE.BoxGeometry(0.46, 0.024, 0.11),
+          this.m_Materials.polishedBrass
+        );
+        balanceBridge.position.set(0, 0.36, -0.04);
+        balanceBridge.castShadow = true;
+        thoraxGroup.add(balanceBridge);
+        this.m_RegisterExplodePart(
+          balanceBridge,
+          new THREE.Vector3(0, 1.15, -0.04),
+          new THREE.Vector3(0, 0.92, -0.1),
+          true
+        );
+
+        // 3. Reciprocating Steam Pistons & Copper Manifold Pipes
+        for (let side of [-1, 1]) {
+          const cylinderGroup = new THREE.Group();
+          cylinderGroup.position.set(side * 0.32, -0.14, -0.24);
+
+          const barrel = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.068, 0.068, 0.28, 16),
+            this.m_Materials.oxidizedCopper
+          );
+          barrel.rotation.x = Math.PI * 0.5;
+          barrel.castShadow = true;
+          cylinderGroup.add(barrel);
+
+          // Brass gland rings
+          for (let rz of [-0.12, 0.12]) {
+            const gland = new THREE.Mesh(
+              new THREE.TorusGeometry(0.072, 0.014, 10, 18),
+              this.m_Materials.polishedBrass
+            );
+            gland.position.z = rz;
+            cylinderGroup.add(gland);
+          }
+
+          // Moving piston rod
+          const pistonRod = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.028, 0.028, 0.32, 12),
+            this.m_Materials.bluedSteel
+          );
+          pistonRod.rotation.x = Math.PI * 0.5;
+          pistonRod.position.z = 0.16;
+          cylinderGroup.add(pistonRod);
+
+          this.m_Pistons.push({
+            mesh: pistonRod,
+            baseZ: 0.16,
+            phaseOffset: side === 1 ? 0 : Math.PI,
+            stroke: 0.085
+          });
+
+          thoraxGroup.add(cylinderGroup);
+          this.m_RegisterExplodePart(
+            cylinderGroup,
+            new THREE.Vector3(side * 0.65, -0.35, -0.25),
+            new THREE.Vector3(side * 0.45, -0.28, -0.35),
+            true
+          );
+        }
+
+        // 4. Split Dorsal Brass Armor Cowls (Left & Right Scutum Shells leaving center clockwork visible)
+        for (let side of [-1, 1]) {
+          const cowlGroup = new THREE.Group();
+          cowlGroup.position.set(side * 0.24, 0.24, 0.0);
+
+          const shellGeo = new THREE.SphereGeometry(
+            0.52,
+            24,
+            18,
+            side === 1 ? 0.15 : Math.PI + 0.15,
+            Math.PI * 0.7,
+            0.12,
+            Math.PI * 0.52
+          );
+          const shellMesh = new THREE.Mesh(shellGeo, this.m_Materials.polishedBrass);
+          shellMesh.scale.set(0.88, 0.72, 1.05);
+          shellMesh.position.x = -side * 0.12;
+          shellMesh.castShadow = true;
+          shellMesh.receiveShadow = true;
+          cowlGroup.add(shellMesh);
+
+          // Decorative copper trim band & rivets on each shoulder plate
+          const trimArch = new THREE.Mesh(
+            new THREE.TorusGeometry(0.42, 0.022, 10, 24, Math.PI * 0.65),
+            this.m_Materials.oxidizedCopper
+          );
+          trimArch.rotation.set(0.35, side * 0.5, side * 0.2);
+          trimArch.position.set(side * 0.05, 0.04, 0);
+          cowlGroup.add(trimArch);
+
+          // Shoulder exhaust chimney stacks
+          const stack = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.045, 0.055, 0.18, 14),
+            this.m_Materials.oxidizedCopper
+          );
+          stack.position.set(side * 0.16, 0.26, 0.18);
+          stack.rotation.z = -side * 0.35;
+          stack.rotation.x = -0.25;
+          stack.castShadow = true;
+          cowlGroup.add(stack);
+
+          const stackRim = new THREE.Mesh(
+            new THREE.TorusGeometry(0.048, 0.012, 8, 16),
+            this.m_Materials.polishedBrass
+          );
+          stackRim.rotation.x = Math.PI * 0.5;
+          stackRim.position.y = 0.09;
+          stack.add(stackRim);
+
+          thoraxGroup.add(cowlGroup);
+          this.m_RegisterExplodePart(
+            cowlGroup,
+            new THREE.Vector3(side * 0.85, 0.68, 0.0),
+            new THREE.Vector3(side * 0.62, 0.52, -0.15),
+            true
+          );
+        }
+
+        // Anterior Pronotum Collar Ring
+        const pronotumCollar = new THREE.Mesh(
+          new THREE.TorusGeometry(0.42, 0.065, 16, 32, Math.PI * 1.25),
+          this.m_Materials.agedBrass
+        );
+        pronotumCollar.position.set(0, 0.08, -0.52);
+        pronotumCollar.rotation.z = -Math.PI * 0.125;
+        pronotumCollar.castShadow = true;
+        thoraxGroup.add(pronotumCollar);
+        this.m_RegisterExplodePart(
+          pronotumCollar,
+          new THREE.Vector3(0, 0.48, -0.52),
+          new THREE.Vector3(0, 0.32, -0.68),
+          true
+        );
+      }
+
+      /**
+       * --------------------------------------------------------------------------
+       * C. FOUR IRIDESCENT MECHANICAL WINGS (FOREWINGS & HINDWINGS)
+       * --------------------------------------------------------------------------
+       */
+      m_BuildFourMechanicalWings() {
+        const wingConfigs = [
+          // Left Forewing
+          {
+            isRight: false,
+            isFore: true,
+            scale: 1.05,
+            pos: new THREE.Vector3(-0.38, 0.34, -0.34),
+            flightEuler: new THREE.Euler(0.15, 0.22, 0.08),
+            idleEuler: new THREE.Euler(0.12, 1.18, -0.18),
+            explodeRadial: new THREE.Vector3(-1.35, 0.72, -0.25),
+            explodeAxial: new THREE.Vector3(-0.85, 0.55, -0.35)
+          },
+          // Right Forewing
+          {
+            isRight: true,
+            isFore: true,
+            scale: 1.05,
+            pos: new THREE.Vector3(0.38, 0.34, -0.34),
+            flightEuler: new THREE.Euler(0.15, -0.22, -0.08),
+            idleEuler: new THREE.Euler(0.12, -1.18, 0.18),
+            explodeRadial: new THREE.Vector3(1.35, 0.72, -0.25),
+            explodeAxial: new THREE.Vector3(0.85, 0.55, -0.35)
+          },
+          // Left Hindwing
+          {
+            isRight: false,
+            isFore: false,
+            scale: 0.74,
+            pos: new THREE.Vector3(-0.35, 0.28, -0.04),
+            flightEuler: new THREE.Euler(0.1, 0.48, 0.04),
+            idleEuler: new THREE.Euler(0.08, 1.26, -0.22),
+            explodeRadial: new THREE.Vector3(-1.15, 0.45, 0.22),
+            explodeAxial: new THREE.Vector3(-0.75, 0.35, 0.18)
+          },
+          // Right Hindwing
+          {
+            isRight: true,
+            isFore: false,
+            scale: 0.74,
+            pos: new THREE.Vector3(0.35, 0.28, -0.04),
+            flightEuler: new THREE.Euler(0.1, -0.48, -0.04),
+            idleEuler: new THREE.Euler(0.08, -1.26, 0.22),
+            explodeRadial: new THREE.Vector3(1.15, 0.45, 0.22),
+            explodeAxial: new THREE.Vector3(0.75, 0.35, 0.18)
+          }
+        ];
+
+        for (let i = 0; i < wingConfigs.length; i++) {
+          const cfg = wingConfigs[i];
+          const mountSocket = new THREE.Group();
+          mountSocket.position.copy(cfg.pos);
+
+          const wingPivot = ProceduralGeometryFactory.createMechanicalWing(
+            cfg.scale,
+            cfg.isRight,
+            this.m_Materials
+          );
+          mountSocket.add(wingPivot);
+          this.m_RootGroup.add(mountSocket);
+
+          this.m_Wings.push({
+            mount: mountSocket,
+            pivot: wingPivot,
+            isRight: cfg.isRight,
+            isFore: cfg.isFore,
+            flightEuler: cfg.flightEuler,
+            idleEuler: cfg.idleEuler
+          });
+
+          this.m_RegisterExplodePart(
+            mountSocket,
+            cfg.explodeRadial,
+            cfg.explodeAxial,
+            true
+          );
+        }
+      }
+
+      /**
+       * --------------------------------------------------------------------------
+       * D. SIX SEGMENTED ARTICULATED MECHANICAL LEGS
+       * Coxa -> Trochanter -> Femur (with hydraulic piston) -> Tibia -> Tarsus & Claws
+       * --------------------------------------------------------------------------
+       */
+      m_BuildSixSegmentedLegs() {
+        const legPairs = [
+          // Pair 0: Prothoracic (Front)
+          {
+            index: 0,
+            attachZ: -0.58,
+            attachX: 0.34,
+            attachY: -0.14,
+            scale: 0.85,
+            yaw: -0.55,
+            axialExplodeZ: -0.45
+          },
+          // Pair 1: Mesothoracic (Middle)
+          {
+            index: 1,
+            attachZ: -0.24,
+            attachX: 0.42,
+            attachY: -0.16,
+            scale: 0.96,
+            yaw: 0.08,
+            axialExplodeZ: -0.05
+          },
+          // Pair 2: Metathoracic (Rear — largest with copper pollen-condenser coil)
+          {
+            index: 2,
+            attachZ: 0.12,
+            attachX: 0.38,
+            attachY: -0.14,
+            scale: 1.15,
+            yaw: 0.68,
+            axialExplodeZ: 0.38
+          }
+        ];
+
+        for (let p = 0; p < legPairs.length; p++) {
+          const pair = legPairs[p];
+          for (let side of [-1, 1]) {
+            const legData = this.m_CreateSingleArticulatedLeg(side, pair);
+            this.m_Legs.push(legData);
+          }
+        }
+      }
+
+      m_CreateSingleArticulatedLeg(side, pair) {
+        const s = pair.scale;
+        const legRoot = new THREE.Group();
+        legRoot.position.set(side * pair.attachX, pair.attachY, pair.attachZ);
+        this.m_RootGroup.add(legRoot);
+
+        // Register whole leg assembly for exploded view
+        this.m_RegisterExplodePart(
+          legRoot,
+          new THREE.Vector3(side * 0.82, -0.58, (pair.index - 1) * 0.38),
+          new THREE.Vector3(side * 0.55, -0.45, pair.axialExplodeZ),
+          true
+        );
+
+        // 1. Coxa Socket & Trochanter Knuckle
+        const coxaGroup = new THREE.Group();
+        coxaGroup.rotation.y = -side * pair.yaw;
+
+        const coxaSocket = new THREE.Mesh(
+          new THREE.SphereGeometry(0.075 * s, 14, 14),
+          this.m_Materials.agedBrass
+        );
+        coxaSocket.castShadow = true;
+        coxaGroup.add(coxaSocket);
+
+        const trochanterStrut = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.048 * s, 0.056 * s, 0.16 * s, 12),
+          this.m_Materials.oxidizedCopper
+        );
+        trochanterStrut.position.set(side * 0.07 * s, -0.04 * s, 0);
+        trochanterStrut.rotation.z = side * 1.1;
+        trochanterStrut.castShadow = true;
+        coxaGroup.add(trochanterStrut);
+
+        legRoot.add(coxaGroup);
+
+        // 2. Femur Girder Segment + Parallel Hydraulic Cylinder
+        const femurPivot = new THREE.Group();
+        femurPivot.position.set(side * 0.14 * s, -0.08 * s, 0);
+        const femurLen = 0.52 * s;
+
+        // Main femur brass beam
+        const femurBeam = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.052 * s, 0.038 * s, femurLen, 12),
+          this.m_Materials.polishedBrass
+        );
+        femurBeam.position.set(side * femurLen * 0.5, 0, 0);
+        femurBeam.rotation.z = -Math.PI * 0.5;
+        femurBeam.castShadow = true;
+        femurPivot.add(femurBeam);
+
+        // Parallel blued-steel hydraulic actuator cylinder
+        const actuatorBarrel = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.024 * s, 0.024 * s, femurLen * 0.65, 10),
+          this.m_Materials.bluedSteel
+        );
+        actuatorBarrel.position.set(side * femurLen * 0.38, -0.055 * s, 0);
+        actuatorBarrel.rotation.z = -Math.PI * 0.5;
+        femurPivot.add(actuatorBarrel);
+
+        const actuatorRod = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.013 * s, 0.013 * s, femurLen * 0.45, 8),
+          this.m_Materials.polishedBrass
+        );
+        actuatorRod.position.set(side * femurLen * 0.72, -0.055 * s, 0);
+        actuatorRod.rotation.z = -Math.PI * 0.5;
+        femurPivot.add(actuatorRod);
+
+        // Knee clevis joint
+        const kneeJoint = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.054 * s, 0.054 * s, 0.09 * s, 14),
+          this.m_Materials.bluedSteel
+        );
+        kneeJoint.rotation.x = Math.PI * 0.5;
+        kneeJoint.position.set(side * femurLen, 0, 0);
+        kneeJoint.castShadow = true;
+        femurPivot.add(kneeJoint);
+
+        coxaGroup.add(femurPivot);
+
+        // 3. Tibia Segment (with condenser coil on rear legs)
+        const tibiaPivot = new THREE.Group();
+        tibiaPivot.position.set(side * femurLen, 0, 0);
+        const tibiaLen = 0.56 * s;
+
+        const tibiaShaft = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.042 * s, 0.024 * s, tibiaLen, 12),
+          this.m_Materials.oxidizedCopper
+        );
+        tibiaShaft.position.set(0, -tibiaLen * 0.5, 0);
+        tibiaShaft.castShadow = true;
+        tibiaPivot.add(tibiaShaft);
+
+        // Reinforcing brass bands on tibia
+        for (let b = 1; b <= 3; b++) {
+          const band = new THREE.Mesh(
+            new THREE.TorusGeometry((0.044 - b * 0.004) * s, 0.009 * s, 8, 16),
+            this.m_Materials.polishedBrass
+          );
+          band.rotation.x = Math.PI * 0.5;
+          band.position.y = -tibiaLen * (b * 0.24);
+          tibiaPivot.add(band);
+        }
+
+        // Rear metathoracic legs get a signature steampunk copper pollen-capacitor coil
+        if (pair.index === 2) {
+          const coilCage = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.062 * s, 0.052 * s, tibiaLen * 0.45, 14),
+            this.m_Materials.agedBrass
+          );
+          coilCage.position.set(side * 0.02 * s, -tibiaLen * 0.46, 0);
+          coilCage.castShadow = true;
+          tibiaPivot.add(coilCage);
+        }
+
+        femurPivot.add(tibiaPivot);
+        this.m_RegisterExplodePart(
+          tibiaPivot,
+          new THREE.Vector3(side * 0.22, -0.25, 0),
+          new THREE.Vector3(side * 0.15, -0.22, 0),
+          false
+        );
+
+        // 4. Segmented Tarsus & Twin Blued-Steel Mechanical Claws
+        const tarsusPivot = new THREE.Group();
+        tarsusPivot.position.set(0, -tibiaLen, 0);
+
+        for (let seg = 0; seg < 3; seg++) {
+          const tBead = new THREE.Mesh(
+            new THREE.CylinderGeometry((0.022 - seg * 0.003) * s, (0.019 - seg * 0.003) * s, 0.075 * s, 10),
+            seg % 2 === 0 ? this.m_Materials.polishedBrass : this.m_Materials.bluedSteel
+          );
+          tBead.position.set(side * seg * 0.024 * s, -0.04 * s - seg * 0.068 * s, 0);
+          tBead.rotation.z = side * 0.32;
+          tBead.castShadow = true;
+          tarsusPivot.add(tBead);
+        }
+
+        // Twin pretarsal grappling claws
+        for (let cSide of [-1, 1]) {
+          const claw = new THREE.Mesh(
+            new THREE.ConeGeometry(0.015 * s, 0.11 * s, 8),
+            this.m_Materials.gunmetalSteel
+          );
+          claw.position.set(side * 0.09 * s, -0.23 * s, cSide * 0.024 * s);
+          claw.rotation.z = -side * 0.85;
+          claw.rotation.x = cSide * 0.28;
+          tarsusPivot.add(claw);
+        }
+
+        tibiaPivot.add(tarsusPivot);
+
+        return {
+          root: legRoot,
+          coxa: coxaGroup,
+          femur: femurPivot,
+          tibia: tibiaPivot,
+          tarsus: tarsusPivot,
+          side,
+          index: pair.index,
+          baseYaw: -side * pair.yaw
+        };
+      }
+
+      /**
+       * --------------------------------------------------------------------------
+       * E. FIVE-PART ARTICULATED ABDOMEN, GLOWING POWER CORE & SPIRAL STINGER
+       * --------------------------------------------------------------------------
+       */
+      m_BuildFivePartAbdomenAndCore() {
+        const abdomenMaster = new THREE.Group();
+        abdomenMaster.position.set(0, 0.04, 0.42);
+        this.m_RootGroup.add(abdomenMaster);
+
+        // 1. Petiole Waist Universal Joint & Copper Fuel Pipes
+        const petioleGroup = new THREE.Group();
+        petioleGroup.position.set(0, 0, -0.05);
+
+        const petioleCore = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.18, 0.22, 0.28, 16),
+          this.m_Materials.bluedSteel
+        );
+        petioleCore.rotation.x = Math.PI * 0.5;
+        petioleCore.castShadow = true;
+        petioleGroup.add(petioleCore);
+
+        for (let i = -1; i <= 1; i++) {
+          const couplingRing = new THREE.Mesh(
+            new THREE.TorusGeometry(0.21, 0.026, 10, 24),
+            this.m_Materials.oxidizedCopper
+          );
+          couplingRing.position.z = i * 0.07;
+          petioleGroup.add(couplingRing);
+        }
+
+        abdomenMaster.add(petioleGroup);
+
+        // 2. Central Glowing Aether Power Core Assembly (housed inside Abdomen Segments 1-4)
+        const coreAssembly = new THREE.Group();
+        coreAssembly.position.set(0, -0.05, 0.92);
+
+        // Inner glowing plasma energy core cylinder + sphere
+        this.m_PowerCoreMesh = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.24, 0.21, 0.92, 24),
+          this.m_Materials.powerCore
+        );
+        this.m_PowerCoreMesh.rotation.x = Math.PI * 0.5;
+        coreAssembly.add(this.m_PowerCoreMesh);
+
+        // Dynamic internal amber point light
+        this.m_PowerCoreLight = new THREE.PointLight(0xff8811, 4.5, 4.2, 1.5);
+        this.m_PowerCoreLight.position.set(0, 0, 0);
+        coreAssembly.add(this.m_PowerCoreLight);
+
+        // Fluted Amber Glass Containment Vessel
+        const glassVessel = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.31, 0.28, 1.02, 24, 1, true),
+          this.m_Materials.containmentGlass
+        );
+        glassVessel.rotation.x = Math.PI * 0.5;
+        coreAssembly.add(glassVessel);
+
+        // End caps of the containment core
+        for (let endSign of [-1, 1]) {
+          const cap = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.32, 0.32, 0.07, 20),
+            this.m_Materials.polishedBrass
+          );
+          cap.rotation.x = Math.PI * 0.5;
+          cap.position.z = endSign * 0.52;
+          coreAssembly.add(cap);
+        }
+
+        // Three counter-rotating gyroscopic brass induction rings around the core
+        for (let g = 0; g < 3; g++) {
+          const gyroRing = new THREE.Mesh(
+            new THREE.TorusGeometry(0.35 + g * 0.025, 0.018, 10, 28),
+            g % 2 === 0 ? this.m_Materials.polishedBrass : this.m_Materials.oxidizedCopper
+          );
+          gyroRing.position.z = (g - 1) * 0.26;
+          coreAssembly.add(gyroRing);
+          this.m_CoreGyroRings.push({
+            mesh: gyroRing,
+            speedX: (g % 2 === 0 ? 1 : -1) * (1.8 + g * 0.5),
+            speedZ: (g % 2 === 0 ? -1 : 1) * (2.4 - g * 0.3)
+          });
+        }
+
+        abdomenMaster.add(coreAssembly);
+        this.m_RegisterExplodePart(
+          coreAssembly,
+          new THREE.Vector3(0, 0.95, 0.25),
+          new THREE.Vector3(0, 0.65, 0.85),
+          true
+        );
+
+        // 3. Five Articulated Abdomen Segments (Telescoping Brass & Oxidized Copper Rings)
+        // Each segment has a dorsal tergite shell (with cutout windows on 2, 3, 4),
+        // a ventral sternite shell, and lateral spiracle exhaust nozzles.
+        const segmentDefinitions = [
+          { idx: 0, zPos: 0.26, rFront: 0.36, rBack: 0.56, len: 0.34, yOffset: -0.01, hasWindow: false },
+          { idx: 1, zPos: 0.58, rFront: 0.55, rBack: 0.68, len: 0.38, yOffset: -0.03, hasWindow: true },
+          { idx: 2, zPos: 0.94, rFront: 0.67, rBack: 0.65, len: 0.40, yOffset: -0.05, hasWindow: true },
+          { idx: 3, zPos: 1.30, rFront: 0.63, rBack: 0.48, len: 0.38, yOffset: -0.08, hasWindow: true },
+          { idx: 4, zPos: 1.64, rFront: 0.46, rBack: 0.21, len: 0.36, yOffset: -0.11, hasWindow: false }
+        ];
+
+        for (let i = 0; i < segmentDefinitions.length; i++) {
+          const def = segmentDefinitions[i];
+          const segGroup = new THREE.Group();
+          segGroup.position.set(0, def.yOffset, def.zPos);
+
+          const primaryMat = i % 2 === 0 ? this.m_Materials.polishedBrass : this.m_Materials.oxidizedCopper;
+          const trimMat = i % 2 === 0 ? this.m_Materials.bluedSteel : this.m_Materials.polishedBrass;
+
+          // A. Dorsal Tergite Armor Hood (slatted / windowed on middle segments to showcase glowing core)
+          const dorsalGroup = new THREE.Group();
+          if (def.hasWindow) {
+            // Left and right upper armor arches leaving a glowing dorsal & lateral observation slot
+            for (let side of [-1, 1]) {
+              const sideArchGeo = new THREE.CylinderGeometry(
+                def.rFront,
+                def.rBack,
+                def.len,
+                20,
+                1,
+                true,
+                side === 1 ? 0.28 : Math.PI + 0.28,
+                Math.PI * 0.58
+              );
+              const sideArch = new THREE.Mesh(sideArchGeo, primaryMat);
+              sideArch.rotation.x = Math.PI * 0.5;
+              sideArch.scale.set(1.04, 1.0, 0.88);
+              sideArch.castShadow = true;
+              sideArch.receiveShadow = true;
+              dorsalGroup.add(sideArch);
+            }
+
+            // Central dorsal spine bridge & protective brass ribs over the glowing core
+            const spineBeam = new THREE.Mesh(
+              new THREE.BoxGeometry(0.11, 0.045, def.len * 1.04),
+              this.m_Materials.bluedSteel
+            );
+            spineBeam.position.y = Math.max(def.rFront, def.rBack) * 0.88;
+            spineBeam.castShadow = true;
+            dorsalGroup.add(spineBeam);
+
+            // Transverse cage ribs
+            for (let rz of [-def.len * 0.38, 0, def.len * 0.38]) {
+              const cageRib = new THREE.Mesh(
+                new THREE.TorusGeometry((def.rFront + def.rBack) * 0.5, 0.022, 10, 28, Math.PI * 1.15),
+                trimMat
+              );
+              cageRib.rotation.z = -Math.PI * 0.075;
+              cageRib.scale.set(1.04, 0.88, 1.0);
+              cageRib.position.z = rz;
+              cageRib.castShadow = true;
+              dorsalGroup.add(cageRib);
+            }
+          } else {
+            // Solid articulated brass/copper tergite hood for Segments 1 and 5
+            const solidHoodGeo = new THREE.CylinderGeometry(
+              def.rFront,
+              def.rBack,
+              def.len,
+              28,
+              1,
+              false,
+              -Math.PI * 0.55,
+              Math.PI * 1.1
+            );
+            const solidHood = new THREE.Mesh(solidHoodGeo, primaryMat);
+            solidHood.rotation.x = Math.PI * 0.5;
+            solidHood.scale.set(1.04, 1.0, 0.88);
+            solidHood.castShadow = true;
+            solidHood.receiveShadow = true;
+            dorsalGroup.add(solidHood);
+          }
+
+          // Riveted posterior overlap rim band
+          const rimBand = new THREE.Mesh(
+            new THREE.TorusGeometry(def.rBack * 0.99, 0.024, 10, 32),
+            trimMat
+          );
+          rimBand.scale.set(1.04, 0.88, 1.0);
+          rimBand.position.z = def.len * 0.46;
+          dorsalGroup.add(rimBand);
+
+          // Rivet studs around the posterior rim
+          const rivetGeo = new THREE.SphereGeometry(0.018, 8, 8);
+          for (let a = -2.2; a <= 2.2; a += 0.44) {
+            const rivet = new THREE.Mesh(rivetGeo, this.m_Materials.polishedBrass);
+            rivet.position.set(
+              Math.sin(a) * def.rBack * 1.05,
+              Math.cos(a) * def.rBack * 0.89,
+              def.len * 0.46
+            );
+            dorsalGroup.add(rivet);
+          }
+
+          segGroup.add(dorsalGroup);
+          // Register dorsal hood to lift radially in exploded view
+          this.m_RegisterExplodePart(
+            dorsalGroup,
+            new THREE.Vector3(0, 0.45 + i * 0.08, 0.1 * i),
+            new THREE.Vector3(0, 0.22, 0),
+            false
+          );
+
+          // B. Ventral Sternite Belly Plate
+          const ventralGroup = new THREE.Group();
+          const sterniteGeo = new THREE.CylinderGeometry(
+            def.rFront * 0.96,
+            def.rBack * 0.96,
+            def.len * 0.92,
+            20,
+            1,
+            true,
+            Math.PI * 0.58,
+            Math.PI * 0.84
+          );
+          const sterniteMesh = new THREE.Mesh(sterniteGeo, this.m_Materials.darkBronze);
+          sterniteMesh.rotation.x = Math.PI * 0.5;
+          sterniteMesh.scale.set(1.02, 1.0, 0.86);
+          sterniteMesh.castShadow = true;
+          ventralGroup.add(sterniteMesh);
+
+          // Lateral Spiracle Steam Relief Valves (left & right)
+          for (let side of [-1, 1]) {
+            const spiracleValve = new THREE.Mesh(
+              new THREE.CylinderGeometry(0.032, 0.042, 0.08, 12),
+              this.m_Materials.polishedBrass
+            );
+            spiracleValve.rotation.z = -side * Math.PI * 0.5;
+            spiracleValve.position.set(side * ((def.rFront + def.rBack) * 0.52), -0.05, 0);
+            ventralGroup.add(spiracleValve);
+          }
+
+          segGroup.add(ventralGroup);
+          this.m_RegisterExplodePart(
+            ventralGroup,
+            new THREE.Vector3(0, -0.42 - i * 0.05, 0.08 * i),
+            new THREE.Vector3(0, -0.18, 0),
+            false
+          );
+
+          abdomenMaster.add(segGroup);
+          this.m_AbdomenSegments.push({
+            group: segGroup,
+            basePos: segGroup.position.clone(),
+            index: i
+          });
+
+          // Register entire segment for axial telescoping and radial expansion
+          this.m_RegisterExplodePart(
+            segGroup,
+            new THREE.Vector3(0, -0.05 * i, (i + 1) * 0.34),
+            new THREE.Vector3(0, -0.04 * i, (i + 1) * 0.58),
+            true
+          );
+        }
+
+        // 4. Precision Spiral Stinger Assembly at Apex of Segment 5
+        this.m_StingerAssembly = new THREE.Group();
+        this.m_StingerAssembly.position.set(0, -0.13, 1.86);
+
+        // Telescoping blued-steel base housing
+        const stingerCollar = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.18, 0.12, 0.18, 18),
+          this.m_Materials.bluedSteel
+        );
+        stingerCollar.rotation.x = Math.PI * 0.5;
+        stingerCollar.castShadow = true;
+        this.m_StingerAssembly.add(stingerCollar);
+
+        // Glowing amber energy injector ring at stinger root
+        const stingerGlowRing = new THREE.Mesh(
+          new THREE.TorusGeometry(0.125, 0.022, 10, 20),
+          this.m_Materials.powerCore
+        );
+        stingerGlowRing.position.z = 0.09;
+        this.m_StingerAssembly.add(stingerGlowRing);
+
+        // Tapered blued-steel needle core
+        const stingerNeedle = new THREE.Mesh(
+          new THREE.ConeGeometry(0.105, 0.68, 20),
+          this.m_Materials.gunmetalSteel
+        );
+        stingerNeedle.rotation.x = Math.PI * 0.5;
+        stingerNeedle.position.z = 0.42;
+        stingerNeedle.castShadow = true;
+        this.m_StingerAssembly.add(stingerNeedle);
+
+        // Coiled brass spiral auger thread wrapped around the stinger needle
+        class ConicalSpiralCurve extends THREE.Curve {
+          getPoint(t, optionalTarget = new THREE.Vector3()) {
+            const turns = 7.5;
+            const angle = t * turns * Math.PI * 2;
+            const radius = (1.0 - t * 0.92) * 0.108;
+            const z = 0.09 + t * 0.62;
+            return optionalTarget.set(Math.cos(angle) * radius, Math.sin(angle) * radius, z);
+          }
+        }
+        const spiralAugerGeo = new THREE.TubeGeometry(new ConicalSpiralCurve(), 120, 0.012, 8, false);
+        const spiralAugerMesh = new THREE.Mesh(spiralAugerGeo, this.m_Materials.polishedBrass);
+        spiralAugerMesh.castShadow = true;
+        this.m_StingerAssembly.add(spiralAugerMesh);
+
+        abdomenMaster.add(this.m_StingerAssembly);
+        this.m_RegisterExplodePart(
+          this.m_StingerAssembly,
+          new THREE.Vector3(0, -0.28, 2.35),
+          new THREE.Vector3(0, -0.22, 3.65),
+          true
+        );
+      }
+
+      /**
+       * --------------------------------------------------------------------------
+       * F. CYAN CAD LEADER LINES FOR EXPLODED VIEW
+       * Connects every exploded component's current world position back to its
+       * un-exploded home anchor position on the parent assembly.
+       * --------------------------------------------------------------------------
+       */
+      m_BuildCyanLeaderLines() {
+        const leaderItems = this.m_ExplodeRegistry.filter(item => item.includeLeaderLine);
+        const count = leaderItems.length;
+
+        const linePositions = new Float32Array(count * 2 * 3);
+        this.m_LeaderLineGeometry = new THREE.BufferGeometry();
+        this.m_LeaderLineGeometry.setAttribute(
+          'position',
+          new THREE.BufferAttribute(linePositions, 3)
+        );
+
+        const lineMat = new THREE.LineDashedMaterial({
+          color: 0x00f2ff,
+          dashSize: 0.055,
+          gapSize: 0.03,
+          transparent: true,
+          opacity: 0.0,
+          depthWrite: false
+        });
+
+        this.m_LeaderLineSegments = new THREE.LineSegments(this.m_LeaderLineGeometry, lineMat);
+        this.m_LeaderLineSegments.visible = false;
+        this.m_LeaderLineSegments.frustumCulled = false;
+        this.m_RootGroup.add(this.m_LeaderLineSegments);
+
+        // Glowing cyan CAD datum nodes at endpoints
+        const dotPositions = new Float32Array(count * 2 * 3);
+        const dotGeo = new THREE.BufferGeometry();
+        dotGeo.setAttribute('position', new THREE.BufferAttribute(dotPositions, 3));
+        const dotMat = new THREE.PointsMaterial({
+          color: 0x00f2ff,
+          size: 0.045,
+          transparent: true,
+          opacity: 0.0,
+          depthWrite: false
+        });
+        this.m_LeaderAnchorDots = new THREE.Points(dotGeo, dotMat);
+        this.m_LeaderAnchorDots.visible = false;
+        this.m_LeaderAnchorDots.frustumCulled = false;
+        this.m_RootGroup.add(this.m_LeaderAnchorDots);
+      }
+
+      /**
+       * --------------------------------------------------------------------------
+       * G. MAIN FRAME UPDATE (KINEMATICS + EXPLODED VIEW + LEADER LINES)
+       * --------------------------------------------------------------------------
+       */
+      update(deltaTime, config) {
+        // 1. Smoothly damp exploded view transition
+        this.m_CurrentExplode = THREE.MathUtils.lerp(
+          this.m_CurrentExplode,
+          config.explodedView,
+          Math.min(1.0, deltaTime * 12.0)
+        );
+
+        // Smooth blend between Flight (1.0) and Idle (0.0)
+        const targetFlightBlend = config.flightMode ? 1.0 : 0.0;
+        this.m_FlightBlend = THREE.MathUtils.lerp(
+          this.m_FlightBlend,
+          targetFlightBlend,
+          Math.min(1.0, deltaTime * 6.0)
+        );
+
+        // 2. Apply Exploded View Offsets along selected axis ('Radial' or 'Axial')
+        const tExplode = this.m_CurrentExplode;
+        const axisMode = config.explodeAxis;
+
+        for (let i = 0; i < this.m_ExplodeRegistry.length; i++) {
+          const item = this.m_ExplodeRegistry[i];
+          const base = item.basePosition;
+
+          let ox = 0, oy = 0, oz = 0;
+          if (axisMode === 'Radial') {
+            ox = item.radialOffset.x * tExplode;
+            oy = item.radialOffset.y * tExplode;
+            oz = item.radialOffset.z * tExplode;
+          } else if (axisMode === 'Axial') {
+            ox = item.axialOffset.x * tExplode;
+            oy = item.axialOffset.y * tExplode;
+            oz = item.axialOffset.z * tExplode;
+          } else {
+            // Combined (Radial + Axial)
+            ox = (item.radialOffset.x * 0.65 + item.axialOffset.x * 0.65) * tExplode;
+            oy = (item.radialOffset.y * 0.65 + item.axialOffset.y * 0.65) * tExplode;
+            oz = (item.radialOffset.z * 0.55 + item.axialOffset.z * 0.75) * tExplode;
+          }
+
+          item.object.position.set(base.x + ox, base.y + oy, base.z + oz);
+        }
+
+        // 3. Advance continuous phase accumulators using deltaTime
+        const activeFlapHz = config.flapFrequency * (0.08 + 0.92 * this.m_FlightBlend);
+        this.m_WingPhase += deltaTime * activeFlapHz * Math.PI * 2.0;
+
+        const baseGearOmega = (1.2 + 2.8 * this.m_FlightBlend) * config.gearSpeed;
+        this.m_GearPhase += deltaTime * baseGearOmega;
+        this.m_BodyPhase += deltaTime * (1.5 + 2.2 * this.m_FlightBlend);
+
+        // 4. Subtle Body Hover / Idle Breathing Motion (attenuated slightly when fully exploded)
+        const motionScale = 1.0 - tExplode * 0.65;
+        const hoverBob = Math.sin(this.m_BodyPhase * 1.4) * (0.025 + 0.075 * this.m_FlightBlend) * motionScale;
+        const hoverPitch = Math.sin(this.m_BodyPhase * 0.9) * (0.015 + 0.045 * this.m_FlightBlend) * motionScale;
+        const hoverRoll = Math.cos(this.m_BodyPhase * 0.75) * (0.01 + 0.035 * this.m_FlightBlend) * motionScale;
+
+        this.m_RootGroup.position.y = hoverBob;
+        this.m_RootGroup.rotation.x = hoverPitch - 0.06 * this.m_FlightBlend * motionScale;
+        this.m_RootGroup.rotation.z = hoverRoll;
+
+        // 5. Head, Mandibles & Spring Antennae Kinematics
+        if (this.m_HeadGroup) {
+          this.m_HeadGroup.rotation.x = Math.sin(this.m_BodyPhase * 1.3) * 0.055 * motionScale;
+          this.m_HeadGroup.rotation.y = Math.sin(this.m_BodyPhase * 0.85) * 0.075 * motionScale;
+        }
+
+        const antennaVib = Math.sin(this.m_WingPhase * 0.5) * 0.028 * this.m_FlightBlend;
+        if (this.m_LeftAntenna) {
+          this.m_LeftAntenna.root.rotation.x =
+            this.m_LeftAntenna.baseRot.x + Math.sin(this.m_BodyPhase * 1.8) * 0.12 + antennaVib;
+          this.m_LeftAntenna.root.rotation.z =
+            this.m_LeftAntenna.baseRot.z + Math.cos(this.m_BodyPhase * 1.4) * 0.08;
+          this.m_LeftAntenna.tip.rotation.x = 0.72 + Math.sin(this.m_BodyPhase * 2.4) * 0.14;
+        }
+        if (this.m_RightAntenna) {
+          this.m_RightAntenna.root.rotation.x =
+            this.m_RightAntenna.baseRot.x + Math.sin(this.m_BodyPhase * 1.8 + 0.9) * 0.12 - antennaVib;
+          this.m_RightAntenna.root.rotation.z =
+            this.m_RightAntenna.baseRot.z + Math.cos(this.m_BodyPhase * 1.4 + 0.9) * 0.08;
+          this.m_RightAntenna.tip.rotation.x = 0.72 + Math.sin(this.m_BodyPhase * 2.4 + 0.9) * 0.14;
+        }
+
+        if (this.m_LeftMandible && this.m_RightMandible) {
+          const pincerAngle = Math.sin(this.m_BodyPhase * 2.1) * 0.12;
+          this.m_LeftMandible.rotation.y = pincerAngle;
+          this.m_RightMandible.rotation.y = -pincerAngle;
+        }
+
+        // 6. Synchronized Interlocking Clockwork Gears & Steam Pistons
+        for (let i = 0; i < this.m_Gears.length; i++) {
+          const g = this.m_Gears[i];
+          if (g.isOscillating) {
+            // Balance wheel oscillates back and forth like a real escapement
+            g.mesh.rotation.y = Math.sin(this.m_GearPhase * g.ratio) * 0.85;
+          } else {
+            g.mesh.rotation.y = this.m_GearPhase * g.ratio + g.phaseOffset;
+          }
+        }
+
+        for (let i = 0; i < this.m_Pistons.length; i++) {
+          const p = this.m_Pistons[i];
+          p.mesh.position.z = p.baseZ + Math.sin(this.m_GearPhase * 2.0 + p.phaseOffset) * p.stroke;
+        }
+
+        // 7. High-Frequency Figure-8 Mechanical Wing Flapping
+        for (let i = 0; i < this.m_Wings.length; i++) {
+          const w = this.m_Wings[i];
+          const sideSign = w.isRight ? 1 : -1;
+          const hindLag = w.isFore ? 0.0 : -0.42;
+          const phase = this.m_WingPhase + hindLag;
+
+          // Interpolate baseline posture between Idle (folded back) and Flight (extended)
+          const baseX = THREE.MathUtils.lerp(w.idleEuler.x, w.flightEuler.x, this.m_FlightBlend);
+          const baseY = THREE.MathUtils.lerp(w.idleEuler.y, w.flightEuler.y, this.m_FlightBlend);
+          const baseZ = THREE.MathUtils.lerp(w.idleEuler.z, w.flightEuler.z, this.m_FlightBlend);
+
+          const flapAmp = (w.isFore ? 0.68 : 0.54) * (0.06 + 0.94 * this.m_FlightBlend);
+          const featherAmp = (w.isFore ? 0.36 : 0.28) * (0.06 + 0.94 * this.m_FlightBlend);
+          const sweepAmp = 0.14 * this.m_FlightBlend;
+
+          // Primary stroke (Z), pronation/supination feathering (X), and figure-8 sweep (Y)
+          w.pivot.rotation.z = baseZ + sideSign * Math.sin(phase) * flapAmp;
+          w.pivot.rotation.x = baseX + Math.cos(phase) * featherAmp;
+          w.pivot.rotation.y = baseY + sideSign * Math.sin(phase * 2.0) * sweepAmp;
+        }
+
+        // 8. Articulated 6-Leg Suspension & Servo Kinematics
+        for (let i = 0; i < this.m_Legs.length; i++) {
+          const leg = this.m_Legs[i];
+          const s = leg.side;
+          const tripodPhase = this.m_BodyPhase * 1.6 + (leg.index * 1.1) + (s === 1 ? 0 : Math.PI);
+
+          // In Flight: aerodynamic tucked posture; In Idle: poised standing stance
+          const femurFlight = -s * 0.22;
+          const femurIdle = s * 0.32;
+          const tibiaFlight = -s * 0.95;
+          const tibiaIdle = -s * 0.38;
+
+          const sway = Math.sin(tripodPhase) * (0.04 + 0.06 * this.m_FlightBlend);
+          leg.coxa.rotation.y = leg.baseYaw + Math.cos(tripodPhase) * 0.05;
+          leg.femur.rotation.z = THREE.MathUtils.lerp(femurIdle, femurFlight, this.m_FlightBlend) + s * sway;
+          leg.tibia.rotation.z = THREE.MathUtils.lerp(tibiaIdle, tibiaFlight, this.m_FlightBlend) - s * sway * 1.3;
+          leg.tarsus.rotation.z = s * (0.25 + Math.sin(tripodPhase + 1.0) * 0.08);
+        }
+
+        // 9. Abdomen Breathing Articulation, Power Core Pulse & Spiral Stinger Rotation
+        for (let i = 0; i < this.m_AbdomenSegments.length; i++) {
+          const seg = this.m_AbdomenSegments[i];
+          const wave = Math.sin(this.m_BodyPhase * 1.8 - i * 0.45) * 0.025 * (1.0 - tExplode * 0.5);
+          seg.group.rotation.x = wave * (i + 1) * 0.35;
+        }
+
+        // Gyroscopic rings & pulsing core light
+        for (let i = 0; i < this.m_CoreGyroRings.length; i++) {
+          const gyro = this.m_CoreGyroRings[i];
+          gyro.mesh.rotation.x += deltaTime * gyro.speedX * config.gearSpeed;
+          gyro.mesh.rotation.z += deltaTime * gyro.speedZ * config.gearSpeed;
+        }
+
+        const corePulse = 0.85 + 0.25 * Math.sin(this.m_GearPhase * 3.0);
+        if (this.m_PowerCoreLight) {
+          this.m_PowerCoreLight.intensity = (3.8 + 1.8 * this.m_FlightBlend) * corePulse;
+        }
+        if (this.m_PowerCoreMesh) {
+          this.m_PowerCoreMesh.rotation.z += deltaTime * 1.5 * config.gearSpeed;
+        }
+        if (this.m_StingerAssembly) {
+          this.m_StingerAssembly.rotation.z += deltaTime * 3.2 * config.gearSpeed;
+        }
+
+        // 10. Update Cyan CAD Leader Lines when Exploded View > 0
+        this.m_UpdateLeaderLines(tExplode);
+      }
+
+      m_UpdateLeaderLines(tExplode) {
+        const showLines = tExplode > 0.004;
+        this.m_LeaderLineSegments.visible = showLines;
+        this.m_LeaderAnchorDots.visible = showLines;
+
+        if (!showLines) return;
+
+        this.m_RootGroup.updateMatrixWorld(true);
+        const rootInverse = new THREE.Matrix4().copy(this.m_RootGroup.matrixWorld).invert();
+
+        const leaderItems = this.m_ExplodeRegistry.filter(item => item.includeLeaderLine);
+        const linePosAttr = this.m_LeaderLineGeometry.attributes.position;
+        const dotPosAttr = this.m_LeaderAnchorDots.geometry.attributes.position;
+
+        const worldCurrent = new THREE.Vector3();
+        const worldOrigin = new THREE.Vector3();
+        const parentMatrix = new THREE.Matrix4();
+
+        for (let i = 0; i < leaderItems.length; i++) {
+          const item = leaderItems[i];
+          const obj = item.object;
+
+          // Current displaced position in root local space
+          worldCurrent.setFromMatrixPosition(obj.matrixWorld).applyMatrix4(rootInverse);
+
+          // Home (un-exploded) position in root local space
+          if (obj.parent) {
+            parentMatrix.copy(obj.parent.matrixWorld);
+            worldOrigin.copy(item.basePosition).applyMatrix4(parentMatrix).applyMatrix4(rootInverse);
+          } else {
+            worldOrigin.copy(item.basePosition);
+          }
+
+          const idx = i * 2;
+          linePosAttr.setXYZ(idx, worldOrigin.x, worldOrigin.y, worldOrigin.z);
+          linePosAttr.setXYZ(idx + 1, worldCurrent.x, worldCurrent.y, worldCurrent.z);
+
+          dotPosAttr.setXYZ(idx, worldOrigin.x, worldOrigin.y, worldOrigin.z);
+          dotPosAttr.setXYZ(idx + 1, worldCurrent.x, worldCurrent.y, worldCurrent.z);
+        }
+
+        linePosAttr.needsUpdate = true;
+        dotPosAttr.needsUpdate = true;
+        this.m_LeaderLineSegments.computeLineDistances();
+
+        const lineOpacity = Math.min(0.88, tExplode * 1.4);
+        this.m_LeaderLineSegments.material.opacity = lineOpacity;
+        this.m_LeaderAnchorDots.material.opacity = Math.min(0.95, tExplode * 1.6);
+      }
+    }
+
+    /**
+     * ============================================================================
+     * 4. MAIN APPLICATION CONTROLLER
+     * Manages WebGLRenderer, ACES Tone Mapping, Studio Lighting, OrbitControls,
+     * lil-gui, Atmospheric Steampunk Motes, and Telemetry HUD.
+     * ============================================================================
+     */
+    class SteampunkBeeApplication {
+      constructor() {
+        // Public GUI configuration state (follows camelCase publicVar convention)
+        this.publicConfig = {
+          explodedView: 0.0,
+          explodeAxis: 'Radial',
+          flapFrequency: 32.0,
+          flightMode: true,
+          modeLabel: 'Flight',
+          gearSpeed: 1.0,
+          wireframe: false,
+          resetCamera: () => this.m_ResetCameraView()
+        };
+
+        // Private members (follow m_VarName convention)
+        this.m_Container = document.getElementById('canvas-container');
+        this.m_Scene = null;
+        this.m_Cam = null;
+        this.m_Renderer = null;
+        this.m_Controls = null;
+        this.m_Gui = null;
+        this.m_Clock = new THREE.Clock();
+        this.m_MaterialLibrary = null;
+        this.m_BeeAutomaton = null;
+        this.m_SteamParticles = null;
+
+        // HUD DOM elements
+        this.m_HudState = document.getElementById('hud-state');
+        this.m_HudFlap = document.getElementById('hud-flap');
+        this.m_HudRpm = document.getElementById('hud-rpm');
+        this.m_HudFlux = document.getElementById('hud-flux');
+        this.m_HudExplode = document.getElementById('hud-explode');
+        this.m_HudDot = document.getElementById('hud-dot');
+
+        this.m_InitializeRendererAndScene();
+        this.m_SetupCinematicLighting();
+        this.m_BuildSceneObjects();
+        this.m_SetupGuiControls();
+        this.m_BindEvents();
+
+        this.m_Animate();
+      }
+
+      m_InitializeRendererAndScene() {
+        this.m_Scene = new THREE.Scene();
+        this.m_Scene.fog = new THREE.FogExp2(0x090b10, 0.048);
+
+        this.m_Cam = new THREE.PerspectiveCamera(
+          42,
+          window.innerWidth / window.innerHeight,
+          0.1,
+          100
+        );
+        this.m_Cam.position.set(3.45, 2.05, -2.95);
+
+        this.m_Renderer = new THREE.WebGLRenderer({
+          antialias: true,
+          powerPreference: 'high-performance'
+        });
+        this.m_Renderer.setSize(window.innerWidth, window.innerHeight);
+        this.m_Renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        this.m_Renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        this.m_Renderer.toneMappingExposure = 1.22;
+        this.m_Renderer.outputColorSpace = THREE.SRGBColorSpace;
+        this.m_Renderer.shadowMap.enabled = true;
+        this.m_Renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        this.m_Container.appendChild(this.m_Renderer.domElement);
+
+        // Studio PBR environment reflections
+        const pmremGenerator = new THREE.PMREMGenerator(this.m_Renderer);
+        pmremGenerator.compileEquirectangularShader();
+        const roomEnv = new RoomEnvironment();
+        this.m_Scene.environment = pmremGenerator.fromScene(roomEnv, 0.04).texture;
+        roomEnv.dispose();
+        pmremGenerator.dispose();
+
+        this.m_Controls = new OrbitControls(this.m_Cam, this.m_Renderer.domElement);
+        this.m_Controls.enableDamping = true;
+        this.m_Controls.dampingFactor = 0.06;
+        this.m_Controls.maxDistance = 16;
+        this.m_Controls.minDistance = 1.2;
+        this.m_Controls.target.set(0, 0.05, 0.15);
+        this.m_Controls.update();
+      }
+
+      m_SetupCinematicLighting() {
+        // 1. Warm Studio Key Spotlight with high-res soft shadows
+        const keyLight = new THREE.SpotLight(0xfff1d6, 55.0);
+        keyLight.position.set(4.5, 6.8, -3.8);
+        keyLight.angle = Math.PI * 0.28;
+        keyLight.penumbra = 0.75;
+        keyLight.decay = 1.6;
+        keyLight.distance = 25;
+        keyLight.castShadow = true;
+        keyLight.shadow.mapSize.width = 2048;
+        keyLight.shadow.mapSize.height = 2048;
+        keyLight.shadow.camera.near = 2.0;
+        keyLight.shadow.camera.far = 16.0;
+        keyLight.shadow.bias = -0.0003;
+        keyLight.shadow.radius = 3.5;
+        this.m_Scene.add(keyLight);
+
+        // 2. Cool Cyan-Blue Rim Backlight (accentuates blued steel & wing iridescence)
+        const rimLight = new THREE.DirectionalLight(0x4dc3ff, 2.6);
+        rimLight.position.set(-4.5, 3.2, 4.8);
+        this.m_Scene.add(rimLight);
+
+        // 3. Warm Copper Under-Bounce Fill Light
+        const bounceLight = new THREE.DirectionalLight(0xff8844, 1.35);
+        bounceLight.position.set(0.5, -4.0, -1.5);
+        this.m_Scene.add(bounceLight);
+
+        // 4. Soft Studio Hemisphere Fill
+        const hemiLight = new THREE.HemisphereLight(0xddeeff, 0x2a1f16, 0.65);
+        this.m_Scene.add(hemiLight);
+      }
+
+      m_BuildSceneObjects() {
+        const maxAniso = this.m_Renderer.capabilities.getMaxAnisotropy();
+        this.m_MaterialLibrary = new ProceduralMaterialLibrary(maxAniso);
+        const materials = this.m_MaterialLibrary.getMaterials();
+
+        // Build the Steampunk Mechanical Bee
+        this.m_BeeAutomaton = new SteampunkMechanicalBee(materials);
+        this.m_Scene.add(this.m_BeeAutomaton.getRootGroup());
+
+        // Studio Calibration Floor Disk (receives soft shadows below the bee)
+        const floorGroup = new THREE.Group();
+        floorGroup.position.set(0, -1.35, 0.15);
+
+        const floorPlane = new THREE.Mesh(
+          new THREE.CircleGeometry(4.8, 64),
+          materials.studioFloor
+        );
+        floorPlane.rotation.x = -Math.PI * 0.5;
+        floorPlane.receiveShadow = true;
+        floorGroup.add(floorPlane);
+
+        const outerBrassBezel = new THREE.Mesh(
+          new THREE.TorusGeometry(4.8, 0.035, 12, 96),
+          materials.agedBrass
+        );
+        outerBrassBezel.rotation.x = Math.PI * 0.5;
+        floorGroup.add(outerBrassBezel);
+
+        this.m_Scene.add(floorGroup);
+
+        // Subtle floating golden dust / aether motes in studio air
+        const particleCount = 140;
+        const pPositions = new Float32Array(particleCount * 3);
+        for (let i = 0; i < particleCount; i++) {
+          pPositions[i * 3] = (Math.random() - 0.5) * 9.0;
+          pPositions[i * 3 + 1] = -1.2 + Math.random() * 4.5;
+          pPositions[i * 3 + 2] = (Math.random() - 0.5) * 9.0;
+        }
+        const pGeo = new THREE.BufferGeometry();
+        pGeo.setAttribute('position', new THREE.BufferAttribute(pPositions, 3));
+        const pMat = new THREE.PointsMaterial({
+          color: 0xffcc66,
+          size: 0.028,
+          transparent: true,
+          opacity: 0.42,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false
+        });
+        this.m_SteamParticles = new THREE.Points(pGeo, pMat);
+        this.m_Scene.add(this.m_SteamParticles);
+      }
+
+      m_SetupGuiControls() {
+        this.m_Gui = new GUI({ title: 'Chronometric Bee Controls', width: 310 });
+
+        // 1. Exploded View (0 - 1 slider)
+        this.m_Gui
+          .add(this.publicConfig, 'explodedView', 0.0, 1.0, 0.001)
+          .name('Exploded View');
+
+        // 2. Explode Axis ('Radial' / 'Axial' / 'Combined')
+        this.m_Gui
+          .add(this.publicConfig, 'explodeAxis', ['Radial', 'Axial', 'Combined'])
+          .name('Explode Axis');
+
+        // 3. Flap Frequency (0 - 60 Hz)
+        this.m_Gui
+          .add(this.publicConfig, 'flapFrequency', 0.0, 60.0, 0.1)
+          .name('Flap Frequency (Hz)');
+
+        // 4. Flight / Idle Mode Selector
+        this.m_Gui
+          .add(this.publicConfig, 'modeLabel', ['Flight', 'Idle'])
+          .name('Flight / Idle')
+          .onChange((val) => {
+            this.publicConfig.flightMode = (val === 'Flight');
+          });
+
+        // 5. Gear Speed (0.1x - 5.0x)
+        this.m_Gui
+          .add(this.publicConfig, 'gearSpeed', 0.1, 5.0, 0.05)
+          .name('Gear Speed (×)');
+
+        // 6. Wireframe Toggle
+        this.m_Gui
+          .add(this.publicConfig, 'wireframe')
+          .name('Wireframe')
+          .onChange((enabled) => {
+            this.m_MaterialLibrary.setWireframe(enabled);
+          });
+
+        // 7. Camera Reset Utility
+        this.m_Gui
+          .add(this.publicConfig, 'resetCamera')
+          .name('Reset Camera View');
+      }
+
+      m_ResetCameraView() {
+        this.m_Cam.position.set(3.45, 2.05, -2.95);
+        this.m_Controls.target.set(0, 0.05, 0.15);
+        this.m_Controls.update();
+      }
+
+      m_BindEvents() {
+        window.addEventListener('resize', () => {
+          this.m_Cam.aspect = window.innerWidth / window.innerHeight;
+          this.m_Cam.updateProjectionMatrix();
+          this.m_Renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+      }
+
+      m_UpdateTelemetryHud() {
+        const isFlight = this.publicConfig.flightMode;
+        this.m_HudState.textContent = isFlight ? 'FLIGHT (ACTIVE)' : 'IDLE (STANDBY)';
+        this.m_HudState.className = isFlight ? 'hud-value amber' : 'hud-value cyan';
+        this.m_HudDot.style.background = isFlight ? '#ff9911' : '#00f2ff';
+        this.m_HudDot.style.boxShadow = isFlight ? '0 0 8px #ff9911' : '0 0 8px #00f2ff';
+
+        const effectiveHz = isFlight
+          ? this.publicConfig.flapFrequency
+          : this.publicConfig.flapFrequency * 0.08;
+        this.m_HudFlap.textContent = `${effectiveHz.toFixed(1)} Hz`;
+
+        const rpm = (isFlight ? 120.0 : 30.0) * this.publicConfig.gearSpeed;
+        this.m_HudRpm.textContent = `${rpm.toFixed(1)} RPM`;
+
+        const flux = isFlight
+          ? Math.min(100, 82.0 + this.publicConfig.gearSpeed * 3.6)
+          : 42.5;
+        this.m_HudFlux.textContent = `${flux.toFixed(1)} %`;
+
+        const explodePct = (this.publicConfig.explodedView * 100).toFixed(1);
+        this.m_HudExplode.textContent = `${explodePct} % (${this.publicConfig.explodeAxis.toUpperCase()})`;
+      }
+
+      m_Animate() {
+        requestAnimationFrame(() => this.m_Animate());
+
+        const deltaTime = Math.min(this.m_Clock.getDelta(), 0.1);
+
+        // Update bee kinematics & exploded CAD view
+        this.m_BeeAutomaton.update(deltaTime, this.publicConfig);
+
+        // Gentle studio particle drift
+        if (this.m_SteamParticles) {
+          this.m_SteamParticles.rotation.y += deltaTime * 0.035;
+        }
+
+        this.m_Controls.update();
+        this.m_UpdateTelemetryHud();
+        this.m_Renderer.render(this.m_Scene, this.m_Cam);
+      }
+    }
+
+    // Bootstrap application
+    window.addEventListener('DOMContentLoaded', () => {
+      new SteampunkBeeApplication();
+    });
+  </script>
+</body>
+</html>

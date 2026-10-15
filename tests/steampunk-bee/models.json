@@ -1,0 +1,58 @@
+{
+  "test": "steampunk-bee",
+  "title": "蒸汽朋克机械蜜蜂 / Steampunk Mechanical Bee",
+  "description": "用单个 HTML 文件实现可交互的蒸汽朋克机械蜜蜂。灵感来自 @NovaXCode 于 2026-10-14 发布的帖子（Gemini / argon 4 用单个 html 做出机械蜜蜂）。原始提示词未公开，本测试各作品使用的提示词可能与原帖不同。",
+  "source": "https://x.com/NovaXCode/status/2110223641111888338",
+  "items": [
+    {
+      "model": "Gemini 4 Argon",
+      "slug": "gemini-4-argon",
+      "duration_min": 10,
+      "duration": "10 分钟",
+      "file": "tests/steampunk-bee/gemini-4-argon/index.html",
+      "thumbnail": "tests/steampunk-bee/gemini-4-argon/thumb.png",
+      "original_filename": "gemini-4argon-10min.html",
+      "source": "Kako Chan 实测提交"
+    },
+    {
+      "model": "Claude Opus 5.5",
+      "slug": "claude-opus-5.5",
+      "duration_min": 180,
+      "duration": "180 分钟",
+      "file": "tests/steampunk-bee/claude-opus-5.5/index.html",
+      "thumbnail": "tests/steampunk-bee/claude-opus-5.5/thumb.png",
+      "original_filename": "steampunk-bee-opus5.5-180min.html",
+      "source": "Kako Chan 实测提交"
+    },
+    {
+      "model": "GLM 5.3 Flash",
+      "slug": "glm-5.3-flash",
+      "duration_min": 38,
+      "duration": "38 分钟",
+      "file": "tests/steampunk-bee/glm-5.3-flash/index.html",
+      "thumbnail": "tests/steampunk-bee/glm-5.3-flash/thumb.png",
+      "original_filename": "steampunk-mechanical-bee-38Min-GLM5.3Flash.html",
+      "source": "Kako Chan 实测提交"
+    },
+    {
+      "model": "Grok",
+      "slug": "grok",
+      "duration_min": 40,
+      "duration": "40 分钟",
+      "file": "tests/steampunk-bee/grok/index.html",
+      "thumbnail": "tests/steampunk-bee/grok/thumb.png",
+      "original_filename": "Grok/steampunk-bee.html",
+      "source": "Kako Chan 实测提交"
+    },
+    {
+      "model": "V41 Flash",
+      "slug": "v41-flash",
+      "duration_min": 12,
+      "duration": "12 分钟",
+      "file": "tests/steampunk-bee/v41-flash/index.html",
+      "thumbnail": "tests/steampunk-bee/v41-flash/thumb.png",
+      "original_filename": "V41Flash/index.html",
+      "source": "Kako Chan 实测提交"
+    }
+  ]
+}
