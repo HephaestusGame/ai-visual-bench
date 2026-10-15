@@ -30,7 +30,7 @@ Generate all geometry and textures procedurally. Use no external models or image
 | Claude Opus 5.5 | 180 分钟 | [运行](https://hephaestusgame.github.io/ai-visual-bench/tests/steampunk-bee/claude-opus-5.5/) · [源码](tests/steampunk-bee/claude-opus-5.5/index.html) |
 | GLM 5.3 Flash | 38 分钟 | [运行](https://hephaestusgame.github.io/ai-visual-bench/tests/steampunk-bee/glm-5.3-flash/) · [源码](tests/steampunk-bee/glm-5.3-flash/index.html) |
 | Grok 4.7 | 40 分钟 | [运行](https://hephaestusgame.github.io/ai-visual-bench/tests/steampunk-bee/grok-4.7/) · [源码](tests/steampunk-bee/grok-4.7/index.html) |
-| V41 Flash | 12 分钟 | [运行](https://hephaestusgame.github.io/ai-visual-bench/tests/steampunk-bee/v41-flash/) · [源码](tests/steampunk-bee/v41-flash/index.html) · [README](tests/steampunk-bee/v41-flash/README.txt) |
+| DeepSeek V41 Flash | 12 分钟 | [运行](https://hephaestusgame.github.io/ai-visual-bench/tests/steampunk-bee/v41-flash/) · [源码](tests/steampunk-bee/v41-flash/index.html) · [README](tests/steampunk-bee/v41-flash/README.txt) |
 
 
 ## 目录结构 / Layout
