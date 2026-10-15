@@ -24,15 +24,17 @@ Rendering: Responsive full-screen WebGL, ACES tone mapping, cinematic studio lig
 Generate all geometry and textures procedurally. Use no external models or image assets. Return complete, executable HTML from <!DOCTYPE html> to </html>, with functional controls, clean code, no placeholders, and no TODOs. Prioritize visual fidelity, mechanical detail, and performance.
 ```
 
+按模型综合能力排序（参考 Artificial Analysis 智能指数与 LMArena，2026-10），非本测试结果。
+
 | 模型 | 耗时 | 链接 |
 |---|---|---|
-| Gemini 4 Argon | 10 分钟 | [运行](https://hephaestusgame.github.io/ai-visual-bench/tests/steampunk-bee/gemini-4-argon/) · [源码](tests/steampunk-bee/gemini-4-argon/index.html) |
 | Claude Opus 5.5 | 150 分钟 | [运行](https://hephaestusgame.github.io/ai-visual-bench/tests/steampunk-bee/claude-opus-5.5/) · [源码](tests/steampunk-bee/claude-opus-5.5/index.html) |
-| GLM 5.3 Flash | 38 分钟 | [运行](https://hephaestusgame.github.io/ai-visual-bench/tests/steampunk-bee/glm-5.3-flash/) · [源码](tests/steampunk-bee/glm-5.3-flash/index.html) |
-| Grok 4.7 | 40 分钟 | [运行](https://hephaestusgame.github.io/ai-visual-bench/tests/steampunk-bee/grok-4.7/) · [源码](tests/steampunk-bee/grok-4.7/index.html) |
-| DeepSeek V41 Flash | 12 分钟 | [运行](https://hephaestusgame.github.io/ai-visual-bench/tests/steampunk-bee/v41-flash/) · [源码](tests/steampunk-bee/v41-flash/index.html) · [README](tests/steampunk-bee/v41-flash/README.txt) |
 | GPT 6 Astra | 18 分钟 | [运行](https://hephaestusgame.github.io/ai-visual-bench/tests/steampunk-bee/gpt-6-astra/) · [源码](tests/steampunk-bee/gpt-6-astra/index.html) |
+| Gemini 4 Argon | 10 分钟 | [运行](https://hephaestusgame.github.io/ai-visual-bench/tests/steampunk-bee/gemini-4-argon/) · [源码](tests/steampunk-bee/gemini-4-argon/index.html) |
+| Grok 4.7 | 40 分钟 | [运行](https://hephaestusgame.github.io/ai-visual-bench/tests/steampunk-bee/grok-4.7/) · [源码](tests/steampunk-bee/grok-4.7/index.html) |
 | GLM 5.3 | 15 分钟 | [运行](https://hephaestusgame.github.io/ai-visual-bench/tests/steampunk-bee/glm-5.3/) · [源码](tests/steampunk-bee/glm-5.3/index.html) |
+| GLM 5.3 Flash | 38 分钟 | [运行](https://hephaestusgame.github.io/ai-visual-bench/tests/steampunk-bee/glm-5.3-flash/) · [源码](tests/steampunk-bee/glm-5.3-flash/index.html) |
+| DeepSeek V4.1 Flash | 12 分钟 | [运行](https://hephaestusgame.github.io/ai-visual-bench/tests/steampunk-bee/v41-flash/) · [源码](tests/steampunk-bee/v41-flash/index.html) · [README](tests/steampunk-bee/v41-flash/README.txt) |
 
 
 ## 目录结构 / Layout
