@@ -35,12 +35,12 @@
       "source": "Kako Chan 实测提交"
     },
     {
-      "model": "Grok",
-      "slug": "grok",
+      "model": "Grok 4.7",
+      "slug": "grok-4.7",
       "duration_min": 40,
       "duration": "40 分钟",
-      "file": "tests/steampunk-bee/grok/index.html",
-      "thumbnail": "tests/steampunk-bee/grok/thumb.png",
+      "file": "tests/steampunk-bee/grok-4.7/index.html",
+      "thumbnail": "tests/steampunk-bee/grok-4.7/thumb.png",
       "original_filename": "Grok/steampunk-bee.html",
       "source": "Kako Chan 实测提交"
     },
