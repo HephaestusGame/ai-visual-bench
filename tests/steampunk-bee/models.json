@@ -17,8 +17,8 @@
     {
       "model": "Claude Opus 5.5",
       "slug": "claude-opus-5.5",
-      "duration_min": 180,
-      "duration": "180 分钟",
+      "duration_min": 150,
+      "duration": "150 分钟",
       "file": "tests/steampunk-bee/claude-opus-5.5/index.html",
       "thumbnail": "tests/steampunk-bee/claude-opus-5.5/thumb.png",
       "original_filename": "steampunk-bee-opus5.5-180min.html",
