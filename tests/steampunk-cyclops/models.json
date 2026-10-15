@@ -16,6 +16,17 @@
       "thumb_version": "3f28d0a1",
       "original_filename": "f144519468f45518454d46e94d5b9933dd7f3a2a16cb3985671466591072408b.html",
       "source": "Kako Chan 实测提交"
+    },
+    {
+      "model": "GrokBot20261015",
+      "slug": "grokbot-20261015",
+      "duration_min": 15,
+      "duration": "15 分钟",
+      "file": "tests/steampunk-cyclops/grokbot-20261015/index.html",
+      "thumbnail": "tests/steampunk-cyclops/grokbot-20261015/thumb.png?v=1d426b4c",
+      "thumb_version": "1d426b4c",
+      "original_filename": "index.html",
+      "source": "Kako Chan 实测提交"
     }
   ]
 }

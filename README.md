@@ -62,6 +62,7 @@ GUI：
 | 模型 | 耗时 | 链接 |
 |---|---|---|
 | GPT 6 Astra | 32 分钟 | [运行](https://hephaestusgame.github.io/ai-visual-bench/tests/steampunk-cyclops/gpt-6-astra/) · [源码](tests/steampunk-cyclops/gpt-6-astra/index.html) |
+| GrokBot20261015 | 15 分钟 | [运行](https://hephaestusgame.github.io/ai-visual-bench/tests/steampunk-cyclops/grokbot-20261015/) · [源码](tests/steampunk-cyclops/grokbot-20261015/index.html) |
 
 ## 目录结构 / Layout
 
