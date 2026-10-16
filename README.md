@@ -98,6 +98,7 @@ GUI：
 |---|---|---|
 | Claude Opus 5.5 | 67 分钟 | [运行](https://hephaestusgame.github.io/ai-visual-bench/tests/steampunk-ninetail-fox/claude-opus-5.5/) · [源码](tests/steampunk-ninetail-fox/claude-opus-5.5/index.html) |
 | GPT 6 Astra | 26 分钟 | [运行](https://hephaestusgame.github.io/ai-visual-bench/tests/steampunk-ninetail-fox/gpt-6-astra/) · [源码](tests/steampunk-ninetail-fox/gpt-6-astra/index.html) |
+| Gemini 4 Argon | 5 分钟 | [运行](https://hephaestusgame.github.io/ai-visual-bench/tests/steampunk-ninetail-fox/gemini-4-argon/) · [源码](tests/steampunk-ninetail-fox/gemini-4-argon/index.html) |
 | GrokBot20261016 | 39 分钟 | [运行](https://hephaestusgame.github.io/ai-visual-bench/tests/steampunk-ninetail-fox/grokbot-20261016/) · [源码](tests/steampunk-ninetail-fox/grokbot-20261016/index.html) |
 
 ## 目录结构 / Layout

@@ -29,6 +29,17 @@
       "source": "Kako Chan 实测提交"
     },
     {
+      "model": "Gemini 4 Argon",
+      "slug": "gemini-4-argon",
+      "duration_min": 5,
+      "duration": "5 分钟",
+      "file": "tests/steampunk-ninetail-fox/gemini-4-argon/index.html",
+      "thumbnail": "tests/steampunk-ninetail-fox/gemini-4-argon/thumb.png?v=674cc777",
+      "thumb_version": "674cc777",
+      "original_filename": "5c3216020b989515ecb65861f19b0b883bcb88b90b8f6ba765adc0f611c8c82a.html",
+      "source": "Kako Chan 实测提交"
+    },
+    {
       "model": "GrokBot20261016",
       "slug": "grokbot-20261016",
       "duration_min": 39,
