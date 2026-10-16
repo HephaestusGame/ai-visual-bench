@@ -7,6 +7,17 @@
   "thumbnail_view": "正面略俯（仰角约 12°，方位约 -12°），九尾狐居中，完整展台",
   "items": [
     {
+      "model": "Claude Opus 5.5",
+      "slug": "claude-opus-5.5",
+      "duration_min": 67,
+      "duration": "67 分钟",
+      "file": "tests/steampunk-ninetail-fox/claude-opus-5.5/index.html",
+      "thumbnail": "tests/steampunk-ninetail-fox/claude-opus-5.5/thumb.png?v=16fefd6e",
+      "thumb_version": "16fefd6e",
+      "original_filename": "9f077767e6051bf7014d338463e2290802676d683fa0d8d7c5193cd3c3e64a55.html",
+      "source": "Kako Chan 实测提交"
+    },
+    {
       "model": "GPT 6 Astra",
       "slug": "gpt-6-astra",
       "duration_min": 26,
