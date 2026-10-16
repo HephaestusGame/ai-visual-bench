@@ -1,0 +1,3078 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>3D 蒸汽朋克独眼巨人 - 工业级程序化角色与动作套件</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #0b0d10;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            color: #e5d5b5;
+        }
+        #canvasContainer {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+        /* 自定义 lil-gui 蒸汽朋克黄铜暗黑风格 */
+        .lil-gui {
+            --background-color: rgba(16, 18, 22, 0.90);
+            --text-color: #e6d2b5;
+            --title-background-color: #261c14;
+            --widget-color: #2b241d;
+            --hover-color: #3d3126;
+            --focus-color: #d97706;
+            --number-color: #38bdf8;
+            --string-color: #f59e0b;
+            border: 1px solid rgba(217, 119, 6, 0.45);
+            border-radius: 8px;
+            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.75);
+            backdrop-filter: blur(8px);
+        }
+        .lil-gui .title {
+            color: #fbbf24;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            border-bottom: 1px solid rgba(217, 119, 6, 0.3);
+        }
+        /* 底部快捷动作栏滚动条美化 */
+        .action-bar::-webkit-scrollbar {
+            height: 5px;
+        }
+        .action-bar::-webkit-scrollbar-track {
+            background: rgba(15, 18, 22, 0.6);
+        }
+        .action-bar::-webkit-scrollbar-thumb {
+            background: rgba(217, 119, 6, 0.5);
+            border-radius: 4px;
+        }
+        .steampunk-panel {
+            background: linear-gradient(145deg, rgba(22, 24, 29, 0.88), rgba(12, 14, 18, 0.92));
+            border: 1px solid rgba(217, 119, 6, 0.4);
+            box-shadow: 0 8px 28px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 215, 150, 0.12);
+            backdrop-filter: blur(8px);
+        }
+        .action-btn {
+            transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+            border: 1px solid rgba(217, 119, 6, 0.35);
+            background: rgba(34, 28, 22, 0.85);
+            color: #f3e3c3;
+        }
+        .action-btn:hover {
+            background: rgba(217, 119, 6, 0.28);
+            border-color: #f59e0b;
+            transform: translateY(-2px);
+        }
+        .action-btn.active {
+            background: linear-gradient(135deg, #d97706, #92400e);
+            border-color: #fde68a;
+            color: #ffffff;
+            box-shadow: 0 0 14px rgba(245, 158, 11, 0.55);
+        }
+    </style>
+
+    <!-- Import Map: Three.js r162 + Addons + lil-gui -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.162.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.162.0/examples/jsm/",
+                "lil-gui": "https://unpkg.com/lil-gui@0.19.1/dist/lil-gui.esm.min.js"
+            }
+        }
+    </script>
+</head>
+<body>
+    <div id="canvasContainer">
+        <!-- 左上角工业仪表盘 HUD -->
+        <div class="fixed top-4 left-4 z-10 pointer-events-none flex flex-col gap-2 max-w-xs sm:max-w-sm">
+            <div class="steampunk-panel rounded-xl px-4 py-3 pointer-events-auto">
+                <div class="flex items-center gap-2.5">
+                    <span class="inline-block w-3 h-3 rounded-full bg-amber-500 animate-pulse shadow-[0_0_10px_#f59e0b]"></span>
+                    <h1 class="text-sm sm:text-base font-bold tracking-wider text-amber-400 uppercase">
+                        铁炉泰坦 · 蒸汽独眼巨人
+                    </h1>
+                </div>
+                <p class="text-xs text-amber-100/70 mt-1 leading-relaxed">
+                    全程序化 PBR 材质 · 14 状态骨骼动力学 · 径向/轴向爆炸拆解视图
+                </p>
+                <div class="mt-2.5 pt-2 border-t border-amber-500/20 flex items-center justify-between text-xs">
+                    <div class="flex items-center gap-2">
+                        <span class="text-amber-300/70">当前状态:</span>
+                        <span id="hudStateLabel" class="font-semibold text-cyan-300 px-2 py-0.5 rounded bg-cyan-950/70 border border-cyan-500/30">
+                            待机呼吸 (Idle)
+                        </span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-amber-200/80 font-mono">
+                        <span id="hudFps">60</span><span>FPS</span>
+                    </div>
+                </div>
+                <!-- 动作进度条 -->
+                <div class="w-full h-1.5 bg-stone-900 rounded-full overflow-hidden mt-2 border border-amber-500/20">
+                    <div id="hudAnimProgress" class="h-full bg-gradient-to-r from-amber-500 via-orange-400 to-cyan-400 transition-all duration-75" style="width: 0%;"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 底部动作状态机快捷切换栏 -->
+        <div class="fixed bottom-4 left-1/2 -translate-x-1/2 z-10 w-[95vw] max-w-5xl pointer-events-auto">
+            <div class="steampunk-panel rounded-xl p-2.5">
+                <div id="actionButtonContainer" class="action-bar flex items-center gap-1.5 overflow-x-auto pb-1">
+                    <!-- 由脚本动态注入 14 个动作按钮 -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import GUI from 'lil-gui';
+
+        // ============================================================================
+        // 1. 程序化纹理与 PBR 材质工厂 (ProceduralTextureFactory)
+        //    严格遵循：公共变量 publicVar（小驼峰），私有变量 m_Var（m_前缀+大驼峰）
+        // ============================================================================
+        class ProceduralTextureFactory {
+            constructor() {
+                // 公共材质字典
+                this.publicMaterials = {};
+                // 私有纹理缓存池
+                this.m_TextureCache = new Map();
+                this.m_InitAllMaterials();
+            }
+
+            /**
+             * 生成伪随机哈希噪声 (2D Value Noise + FBM)
+             */
+            m_Hash2D(x, y, seed = 1337) {
+                const n = Math.sin(x * 127.1 + y * 311.7 + seed * 74.7) * 43758.5453123;
+                return n - Math.floor(n);
+            }
+
+            m_SmoothNoise(x, y, seed = 1337) {
+                const ix = Math.floor(x);
+                const iy = Math.floor(y);
+                const fx = x - ix;
+                const fy = y - iy;
+                const ux = fx * fx * (3.0 - 2.0 * fx);
+                const uy = fy * fy * (3.0 - 2.0 * fy);
+
+                const a = this.m_Hash2D(ix, iy, seed);
+                const b = this.m_Hash2D(ix + 1, iy, seed);
+                const c = this.m_Hash2D(ix, iy + 1, seed);
+                const d = this.m_Hash2D(ix + 1, iy + 1, seed);
+
+                return a + (b - a) * ux + (c - a) * uy + (a - b - c + d) * ux * uy;
+            }
+
+            m_Fbm(x, y, octaves = 4, seed = 1337) {
+                let value = 0.0;
+                let amplitude = 0.5;
+                let frequency = 1.0;
+                for (let i = 0; i < octaves; i++) {
+                    value += amplitude * this.m_SmoothNoise(x * frequency, y * frequency, seed + i * 19);
+                    frequency *= 2.02;
+                    amplitude *= 0.5;
+                }
+                return value;
+            }
+
+            /**
+             * 1. 黄铜纹理（带划痕、金属磨损与铆钉凹凸）
+             */
+            m_CreateBrassTextures() {
+                const size = 512;
+                const colorCanvas = document.createElement('canvas');
+                const roughCanvas = document.createElement('canvas');
+                const bumpCanvas = document.createElement('canvas');
+                colorCanvas.width = roughCanvas.width = bumpCanvas.width = size;
+                colorCanvas.height = roughCanvas.height = bumpCanvas.height = size;
+
+                const cCtx = colorCanvas.getContext('2d');
+                const rCtx = roughCanvas.getContext('2d');
+                const bCtx = bumpCanvas.getContext('2d');
+
+                const cData = cCtx.createImageData(size, size);
+                const rData = rCtx.createImageData(size, size);
+                const bData = bCtx.createImageData(size, size);
+
+                for (let y = 0; y < size; y++) {
+                    for (let x = 0; x < size; x++) {
+                        const idx = (y * size + x) * 4;
+                        const n = this.m_Fbm(x / 48, y / 48, 4, 101);
+                        const fine = this.m_Fbm(x / 8, y / 8, 2, 202);
+                        // 拉丝与划痕
+                        const scratch = Math.abs(Math.sin((x * 0.35 + y * 0.05) + fine * 6.0)) < 0.06 ? -28 : 0;
+                        const tarnish = n > 0.62 ? (n - 0.62) * 140 : 0;
+
+                        const r = Math.min(255, Math.max(0, 212 - tarnish * 1.1 + (n - 0.5) * 40 + scratch));
+                        const g = Math.min(255, Math.max(0, 165 - tarnish * 0.9 + (n - 0.5) * 35 + scratch));
+                        const b = Math.min(255, Math.max(0, 68 - tarnish * 0.5 + (n - 0.5) * 25 + scratch));
+
+                        cData.data[idx] = r;
+                        cData.data[idx + 1] = g;
+                        cData.data[idx + 2] = b;
+                        cData.data[idx + 3] = 255;
+
+                        const roughVal = Math.min(255, Math.max(25, 65 + tarnish * 1.8 - scratch * 2.0 + fine * 35));
+                        rData.data[idx] = rData.data[idx + 1] = rData.data[idx + 2] = roughVal;
+                        rData.data[idx + 3] = 255;
+
+                        const bumpVal = Math.min(255, Math.max(0, 128 + scratch * 2.5 + (fine - 0.5) * 40));
+                        bData.data[idx] = bData.data[idx + 1] = bData.data[idx + 2] = bumpVal;
+                        bData.data[idx + 3] = 255;
+                    }
+                }
+                cCtx.putImageData(cData, 0, 0);
+                rCtx.putImageData(rData, 0, 0);
+                bCtx.putImageData(bData, 0, 0);
+
+                return this.m_PackCanvasTextures(colorCanvas, roughCanvas, bumpCanvas, 3);
+            }
+
+            /**
+             * 2. 氧化铜与铜绿 (Copper + Verdigris Patina)
+             */
+            m_CreateCopperTextures() {
+                const size = 512;
+                const colorCanvas = document.createElement('canvas');
+                const roughCanvas = document.createElement('canvas');
+                const bumpCanvas = document.createElement('canvas');
+                colorCanvas.width = roughCanvas.width = bumpCanvas.width = size;
+                colorCanvas.height = roughCanvas.height = bumpCanvas.height = size;
+
+                const cCtx = colorCanvas.getContext('2d');
+                const rCtx = roughCanvas.getContext('2d');
+                const bCtx = bumpCanvas.getContext('2d');
+
+                const cData = cCtx.createImageData(size, size);
+                const rData = rCtx.createImageData(size, size);
+                const bData = bCtx.createImageData(size, size);
+
+                for (let y = 0; y < size; y++) {
+                    for (let x = 0; x < size; x++) {
+                        const idx = (y * size + x) * 4;
+                        const n = this.m_Fbm(x / 40, y / 40, 5, 303);
+                        const detail = this.m_Fbm(x / 10, y / 10, 3, 404);
+                        // 铜绿掩膜
+                        const patinaMask = Math.max(0, Math.min(1, (n - 0.52) * 3.8));
+
+                        const baseR = 196 + (detail - 0.5) * 35;
+                        const baseG = 104 + (detail - 0.5) * 28;
+                        const baseB = 66 + (detail - 0.5) * 20;
+
+                        const patR = 66;
+                        const patG = 165;
+                        const patB = 142;
+
+                        cData.data[idx] = baseR * (1 - patinaMask) + patR * patinaMask;
+                        cData.data[idx + 1] = baseG * (1 - patinaMask) + patG * patinaMask;
+                        cData.data[idx + 2] = baseB * (1 - patinaMask) + patB * patinaMask;
+                        cData.data[idx + 3] = 255;
+
+                        const roughVal = 65 * (1 - patinaMask) + 215 * patinaMask;
+                        rData.data[idx] = rData.data[idx + 1] = rData.data[idx + 2] = roughVal;
+                        rData.data[idx + 3] = 255;
+
+                        const bumpVal = 128 + (detail - 0.5) * 50 + patinaMask * 45;
+                        bData.data[idx] = bData.data[idx + 1] = bData.data[idx + 2] = Math.min(255, Math.max(0, bumpVal));
+                        bData.data[idx + 3] = 255;
+                    }
+                }
+                cCtx.putImageData(cData, 0, 0);
+                rCtx.putImageData(rData, 0, 0);
+                bCtx.putImageData(bData, 0, 0);
+
+                return this.m_PackCanvasTextures(colorCanvas, roughCanvas, bumpCanvas, 2);
+            }
+
+            /**
+             * 3. 锈蚀铁甲 (Rusted Iron)
+             */
+            m_CreateRustedIronTextures() {
+                const size = 512;
+                const colorCanvas = document.createElement('canvas');
+                const roughCanvas = document.createElement('canvas');
+                const bumpCanvas = document.createElement('canvas');
+                colorCanvas.width = roughCanvas.width = bumpCanvas.width = size;
+                colorCanvas.height = roughCanvas.height = bumpCanvas.height = size;
+
+                const cCtx = colorCanvas.getContext('2d');
+                const rCtx = roughCanvas.getContext('2d');
+                const bCtx = bumpCanvas.getContext('2d');
+
+                const cData = cCtx.createImageData(size, size);
+                const rData = rCtx.createImageData(size, size);
+                const bData = bCtx.createImageData(size, size);
+
+                for (let y = 0; y < size; y++) {
+                    for (let x = 0; x < size; x++) {
+                        const idx = (y * size + x) * 4;
+                        const n = this.m_Fbm(x / 36, y / 36, 5, 505);
+                        const grit = this.m_Fbm(x / 6, y / 6, 3, 606);
+                        const rustFactor = Math.max(0, Math.min(1, (n - 0.44) * 3.2));
+
+                        const ironR = 68 + grit * 24;
+                        const ironG = 72 + grit * 24;
+                        const ironB = 78 + grit * 26;
+
+                        const rustR = 148 + (grit - 0.5) * 55;
+                        const rustG = 62 + (grit - 0.5) * 30;
+                        const rustB = 28 + (grit - 0.5) * 18;
+
+                        cData.data[idx] = ironR * (1 - rustFactor) + rustR * rustFactor;
+                        cData.data[idx + 1] = ironG * (1 - rustFactor) + rustG * rustFactor;
+                        cData.data[idx + 2] = ironB * (1 - rustFactor) + rustB * rustFactor;
+                        cData.data[idx + 3] = 255;
+
+                        const roughVal = 115 * (1 - rustFactor) + 238 * rustFactor;
+                        rData.data[idx] = rData.data[idx + 1] = rData.data[idx + 2] = roughVal;
+                        rData.data[idx + 3] = 255;
+
+                        const bumpVal = 128 - rustFactor * 60 + (grit - 0.5) * 80;
+                        bData.data[idx] = bData.data[idx + 1] = bData.data[idx + 2] = Math.min(255, Math.max(0, bumpVal));
+                        bData.data[idx + 3] = 255;
+                    }
+                }
+                cCtx.putImageData(cData, 0, 0);
+                rCtx.putImageData(rData, 0, 0);
+                bCtx.putImageData(bData, 0, 0);
+
+                return this.m_PackCanvasTextures(colorCanvas, roughCanvas, bumpCanvas, 2);
+            }
+
+            /**
+             * 4. 发蓝精钢 (Blued Steel)
+             */
+            m_CreateBluedSteelTextures() {
+                const size = 512;
+                const colorCanvas = document.createElement('canvas');
+                const roughCanvas = document.createElement('canvas');
+                const bumpCanvas = document.createElement('canvas');
+                colorCanvas.width = roughCanvas.width = bumpCanvas.width = size;
+                colorCanvas.height = roughCanvas.height = bumpCanvas.height = size;
+
+                const cCtx = colorCanvas.getContext('2d');
+                const rCtx = roughCanvas.getContext('2d');
+                const bCtx = bumpCanvas.getContext('2d');
+
+                const cData = cCtx.createImageData(size, size);
+                const rData = rCtx.createImageData(size, size);
+                const bData = bCtx.createImageData(size, size);
+
+                for (let y = 0; y < size; y++) {
+                    for (let x = 0; x < size; x++) {
+                        const idx = (y * size + x) * 4;
+                        const brush = this.m_SmoothNoise(x / 3, y / 64, 707);
+                        const wear = this.m_Fbm(x / 32, y / 32, 3, 808);
+
+                        cData.data[idx] = 44 + brush * 22 + wear * 18;
+                        cData.data[idx + 1] = 58 + brush * 26 + wear * 20;
+                        cData.data[idx + 2] = 82 + brush * 32 + wear * 24;
+                        cData.data[idx + 3] = 255;
+
+                        const roughVal = 55 + brush * 45 + wear * 30;
+                        rData.data[idx] = rData.data[idx + 1] = rData.data[idx + 2] = roughVal;
+                        rData.data[idx + 3] = 255;
+
+                        const bumpVal = 120 + brush * 30;
+                        bData.data[idx] = bData.data[idx + 1] = bData.data[idx + 2] = bumpVal;
+                        bData.data[idx + 3] = 255;
+                    }
+                }
+                cCtx.putImageData(cData, 0, 0);
+                rCtx.putImageData(rData, 0, 0);
+                bCtx.putImageData(bData, 0, 0);
+
+                return this.m_PackCanvasTextures(colorCanvas, roughCanvas, bumpCanvas, 2);
+            }
+
+            /**
+             * 5. 裂纹皮革 (Cracked Leather)
+             */
+            m_CreateLeatherTextures() {
+                const size = 512;
+                const colorCanvas = document.createElement('canvas');
+                const roughCanvas = document.createElement('canvas');
+                const bumpCanvas = document.createElement('canvas');
+                colorCanvas.width = roughCanvas.width = bumpCanvas.width = size;
+                colorCanvas.height = roughCanvas.height = bumpCanvas.height = size;
+
+                const cCtx = colorCanvas.getContext('2d');
+                const rCtx = roughCanvas.getContext('2d');
+                const bCtx = bumpCanvas.getContext('2d');
+
+                const cData = cCtx.createImageData(size, size);
+                const rData = rCtx.createImageData(size, size);
+                const bData = bCtx.createImageData(size, size);
+
+                for (let y = 0; y < size; y++) {
+                    for (let x = 0; x < size; x++) {
+                        const idx = (y * size + x) * 4;
+                        const grain = this.m_Fbm(x / 12, y / 12, 4, 909);
+                        const macro = this.m_Fbm(x / 48, y / 48, 3, 1010);
+                        // 皮革裂纹网
+                        const crackWave = Math.abs(Math.sin(x * 0.09 + grain * 5.5) * Math.cos(y * 0.09 + macro * 5.5));
+                        const isCrack = crackWave < 0.065 ? 1.0 : 0.0;
+
+                        const r = (92 + macro * 35 - grain * 18) * (1 - isCrack * 0.45);
+                        const g = (52 + macro * 22 - grain * 12) * (1 - isCrack * 0.45);
+                        const b = (28 + macro * 14 - grain * 8) * (1 - isCrack * 0.45);
+
+                        cData.data[idx] = r;
+                        cData.data[idx + 1] = g;
+                        cData.data[idx + 2] = b;
+                        cData.data[idx + 3] = 255;
+
+                        const roughVal = 155 + grain * 55 + isCrack * 40;
+                        rData.data[idx] = rData.data[idx + 1] = rData.data[idx + 2] = Math.min(255, roughVal);
+                        rData.data[idx + 3] = 255;
+
+                        const bumpVal = isCrack > 0 ? 45 : 135 + (grain - 0.5) * 65;
+                        bData.data[idx] = bData.data[idx + 1] = bData.data[idx + 2] = bumpVal;
+                        bData.data[idx + 3] = 255;
+                    }
+                }
+                cCtx.putImageData(cData, 0, 0);
+                rCtx.putImageData(rData, 0, 0);
+                bCtx.putImageData(bData, 0, 0);
+
+                return this.m_PackCanvasTextures(colorCanvas, roughCanvas, bumpCanvas, 3);
+            }
+
+            /**
+             * 6. 岩石质巨人皮肤 (Rocky Skin)
+             */
+            m_CreateRockySkinTextures() {
+                const size = 512;
+                const colorCanvas = document.createElement('canvas');
+                const roughCanvas = document.createElement('canvas');
+                const bumpCanvas = document.createElement('canvas');
+                colorCanvas.width = roughCanvas.width = bumpCanvas.width = size;
+                colorCanvas.height = roughCanvas.height = bumpCanvas.height = size;
+
+                const cCtx = colorCanvas.getContext('2d');
+                const rCtx = roughCanvas.getContext('2d');
+                const bCtx = bumpCanvas.getContext('2d');
+
+                const cData = cCtx.createImageData(size, size);
+                const rData = rCtx.createImageData(size, size);
+                const bData = bCtx.createImageData(size, size);
+
+                for (let y = 0; y < size; y++) {
+                    for (let x = 0; x < size; x++) {
+                        const idx = (y * size + x) * 4;
+                        const crag = this.m_Fbm(x / 28, y / 28, 5, 1111);
+                        const pore = this.m_Fbm(x / 6, y / 6, 3, 1212);
+                        const fissure = Math.abs(crag - 0.5) < 0.028 ? 1.0 : 0.0;
+
+                        const r = (94 + crag * 42 + pore * 16) * (1 - fissure * 0.55);
+                        const g = (86 + crag * 38 + pore * 14) * (1 - fissure * 0.55);
+                        const b = (78 + crag * 34 + pore * 12) * (1 - fissure * 0.55);
+
+                        cData.data[idx] = r;
+                        cData.data[idx + 1] = g;
+                        cData.data[idx + 2] = b;
+                        cData.data[idx + 3] = 255;
+
+                        const roughVal = 185 + pore * 55;
+                        rData.data[idx] = rData.data[idx + 1] = rData.data[idx + 2] = Math.min(255, roughVal);
+                        rData.data[idx + 3] = 255;
+
+                        const bumpVal = fissure > 0 ? 20 : 128 + (crag - 0.5) * 110 + (pore - 0.5) * 50;
+                        bData.data[idx] = bData.data[idx + 1] = bData.data[idx + 2] = Math.min(255, Math.max(0, bumpVal));
+                        bData.data[idx + 3] = 255;
+                    }
+                }
+                cCtx.putImageData(cData, 0, 0);
+                rCtx.putImageData(rData, 0, 0);
+                bCtx.putImageData(bData, 0, 0);
+
+                return this.m_PackCanvasTextures(colorCanvas, roughCanvas, bumpCanvas, 2);
+            }
+
+            /**
+             * 7. 琥珀色玻璃独眼纹理 (Amber Glass Eyeball)
+             */
+            m_CreateAmberEyeTexture() {
+                const size = 512;
+                const canvas = document.createElement('canvas');
+                canvas.width = canvas.height = size;
+                const ctx = canvas.getContext('2d');
+                const cx = size / 2;
+                const cy = size / 2;
+
+                // 巩膜与暗色机械基底
+                ctx.fillStyle = '#1c1208';
+                ctx.fillRect(0, 0, size, size);
+
+                // 琥珀虹膜渐变
+                const grad = ctx.createRadialGradient(cx, cy, size * 0.05, cx, cy, size * 0.46);
+                grad.addColorStop(0.0, '#050302');
+                grad.addColorStop(0.16, '#090502');
+                grad.addColorStop(0.19, '#fef08a');
+                grad.addColorStop(0.32, '#f59e0b');
+                grad.addColorStop(0.58, '#b45309');
+                grad.addColorStop(0.78, '#451a03');
+                grad.addColorStop(1.0, '#120904');
+                ctx.fillStyle = grad;
+                ctx.beginPath();
+                ctx.arc(cx, cy, size * 0.48, 0, Math.PI * 2);
+                ctx.fill();
+
+                // 虹膜放射状机械刻度与血丝纤维
+                ctx.save();
+                ctx.translate(cx, cy);
+                for (let i = 0; i < 120; i++) {
+                    const angle = (i / 120) * Math.PI * 2;
+                    const innerR = size * (0.17 + (i % 3) * 0.015);
+                    const outerR = size * (0.38 + (i % 5) * 0.018);
+                    ctx.strokeStyle = i % 2 === 0 ? 'rgba(254, 240, 138, 0.42)' : 'rgba(120, 53, 15, 0.55)';
+                    ctx.lineWidth = i % 6 === 0 ? 2.2 : 1.0;
+                    ctx.beginPath();
+                    ctx.moveTo(Math.cos(angle) * innerR, Math.sin(angle) * innerR);
+                    ctx.lineTo(Math.cos(angle) * outerR, Math.sin(angle) * outerR);
+                    ctx.stroke();
+                }
+
+                // 精密蒸汽朋克瞳孔光圈环
+                ctx.strokeStyle = 'rgba(253, 224, 71, 0.75)';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.arc(0, 0, size * 0.21, 0, Math.PI * 2);
+                ctx.stroke();
+
+                ctx.restore();
+
+                const tex = new THREE.CanvasTexture(canvas);
+                tex.colorSpace = THREE.SRGBColorSpace;
+                tex.needsUpdate = true;
+                return tex;
+            }
+
+            /**
+             * 8. 压力表盘纹理 (Pressure Gauge Dial)
+             */
+            m_CreateGaugeDialTexture() {
+                const size = 256;
+                const canvas = document.createElement('canvas');
+                canvas.width = canvas.height = size;
+                const ctx = canvas.getContext('2d');
+                const cx = size / 2;
+                const cy = size / 2;
+
+                // 复古泛黄表盘底面
+                const bgGrad = ctx.createRadialGradient(cx, cy, 10, cx, cy, size * 0.48);
+                bgGrad.addColorStop(0, '#f5ebd6');
+                bgGrad.addColorStop(0.8, '#d4be94');
+                bgGrad.addColorStop(1, '#785c38');
+                ctx.fillStyle = bgGrad;
+                ctx.beginPath();
+                ctx.arc(cx, cy, size * 0.48, 0, Math.PI * 2);
+                ctx.fill();
+
+                // 红色高压危险区弧线
+                ctx.strokeStyle = '#dc2626';
+                ctx.lineWidth = 10;
+                ctx.beginPath();
+                ctx.arc(cx, cy, size * 0.37, -Math.PI * 0.15, Math.PI * 0.35);
+                ctx.stroke();
+
+                // 刻度线
+                ctx.save();
+                ctx.translate(cx, cy);
+                for (let i = 0; i <= 24; i++) {
+                    const a = (-Math.PI * 0.75) + (i / 24) * (Math.PI * 1.5);
+                    ctx.strokeStyle = i > 18 ? '#b91c1c' : '#1c1917';
+                    ctx.lineWidth = i % 4 === 0 ? 3.5 : 1.5;
+                    const r1 = i % 4 === 0 ? size * 0.30 : size * 0.34;
+                    const r2 = size * 0.42;
+                    ctx.beginPath();
+                    ctx.moveTo(Math.cos(a) * r1, Math.sin(a) * r1);
+                    ctx.lineTo(Math.cos(a) * r2, Math.sin(a) * r2);
+                    ctx.stroke();
+                }
+                // 指针
+                ctx.rotate(0.45);
+                ctx.fillStyle = '#991b1b';
+                ctx.beginPath();
+                ctx.moveTo(-6, 18);
+                ctx.lineTo(0, -size * 0.38);
+                ctx.lineTo(6, 18);
+                ctx.closePath();
+                ctx.fill();
+
+                ctx.fillStyle = '#292524';
+                ctx.beginPath();
+                ctx.arc(0, 0, 10, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+
+                const tex = new THREE.CanvasTexture(canvas);
+                tex.colorSpace = THREE.SRGBColorSpace;
+                return tex;
+            }
+
+            /**
+             * 打包 Canvas 为 Repeat Wrapping 的 Three.js 纹理组
+             */
+            m_PackCanvasTextures(colorCanvas, roughCanvas, bumpCanvas, repeatCount = 2) {
+                const map = new THREE.CanvasTexture(colorCanvas);
+                map.colorSpace = THREE.SRGBColorSpace;
+                const roughnessMap = new THREE.CanvasTexture(roughCanvas);
+                const bumpMap = new THREE.CanvasTexture(bumpCanvas);
+
+                [map, roughnessMap, bumpMap].forEach((t) => {
+                    t.wrapS = THREE.RepeatWrapping;
+                    t.wrapT = THREE.RepeatWrapping;
+                    t.repeat.set(repeatCount, repeatCount);
+                    t.needsUpdate = true;
+                });
+
+                return { map, roughnessMap, bumpMap };
+            }
+
+            /**
+             * 初始化所有 PBR 材质
+             */
+            m_InitAllMaterials() {
+                const brassTex = this.m_CreateBrassTextures();
+                const copperTex = this.m_CreateCopperTextures();
+                const ironTex = this.m_CreateRustedIronTextures();
+                const steelTex = this.m_CreateBluedSteelTextures();
+                const leatherTex = this.m_CreateLeatherTextures();
+                const rockTex = this.m_CreateRockySkinTextures();
+                const eyeMap = this.m_CreateAmberEyeTexture();
+                const gaugeMap = this.m_CreateGaugeDialTexture();
+
+                this.publicMaterials = {
+                    brass: new THREE.MeshStandardMaterial({
+                        name: 'WeatheredBrass',
+                        map: brassTex.map,
+                        roughnessMap: brassTex.roughnessMap,
+                        bumpMap: brassTex.bumpMap,
+                        bumpScale: 0.018,
+                        metalness: 0.88,
+                        roughness: 0.32
+                    }),
+                    copper: new THREE.MeshStandardMaterial({
+                        name: 'OxidizedCopper',
+                        map: copperTex.map,
+                        roughnessMap: copperTex.roughnessMap,
+                        bumpMap: copperTex.bumpMap,
+                        bumpScale: 0.022,
+                        metalness: 0.78,
+                        roughness: 0.48
+                    }),
+                    rustedIron: new THREE.MeshStandardMaterial({
+                        name: 'RustedIron',
+                        map: ironTex.map,
+                        roughnessMap: ironTex.roughnessMap,
+                        bumpMap: ironTex.bumpMap,
+                        bumpScale: 0.038,
+                        metalness: 0.68,
+                        roughness: 0.72
+                    }),
+                    bluedSteel: new THREE.MeshStandardMaterial({
+                        name: 'BluedSteel',
+                        map: steelTex.map,
+                        roughnessMap: steelTex.roughnessMap,
+                        bumpMap: steelTex.bumpMap,
+                        bumpScale: 0.015,
+                        metalness: 0.92,
+                        roughness: 0.28
+                    }),
+                    leather: new THREE.MeshStandardMaterial({
+                        name: 'CrackedLeather',
+                        map: leatherTex.map,
+                        roughnessMap: leatherTex.roughnessMap,
+                        bumpMap: leatherTex.bumpMap,
+                        bumpScale: 0.028,
+                        metalness: 0.08,
+                        roughness: 0.78
+                    }),
+                    rockSkin: new THREE.MeshStandardMaterial({
+                        name: 'RockySkin',
+                        map: rockTex.map,
+                        roughnessMap: rockTex.roughnessMap,
+                        bumpMap: rockTex.bumpMap,
+                        bumpScale: 0.055,
+                        metalness: 0.05,
+                        roughness: 0.88
+                    }),
+                    amberEye: new THREE.MeshPhysicalMaterial({
+                        name: 'AmberGlassEye',
+                        map: eyeMap,
+                        emissive: new THREE.Color(0xff9900),
+                        emissiveMap: eyeMap,
+                        emissiveIntensity: 1.6,
+                        roughness: 0.06,
+                        metalness: 0.1,
+                        clearcoat: 1.0,
+                        clearcoatRoughness: 0.04,
+                        reflectivity: 1.0
+                    }),
+                    boilerCore: new THREE.MeshStandardMaterial({
+                        name: 'BoilerEnergyCore',
+                        color: new THREE.Color(0xffedd5),
+                        emissive: new THREE.Color(0xff6b00),
+                        emissiveIntensity: 3.2,
+                        roughness: 0.15,
+                        metalness: 0.1
+                    }),
+                    hammerCore: new THREE.MeshStandardMaterial({
+                        name: 'HammerEnergyCore',
+                        color: new THREE.Color(0xe0f2fe),
+                        emissive: new THREE.Color(0xff8800),
+                        emissiveIntensity: 3.5,
+                        roughness: 0.15,
+                        metalness: 0.1
+                    }),
+                    gaugeFace: new THREE.MeshBasicMaterial({
+                        name: 'GaugeDialFace',
+                        map: gaugeMap
+                    })
+                };
+            }
+        }
+
+        // ============================================================================
+        // 2. 蒸汽朋克独眼巨人角色构建器 (SteampunkCyclopsCharacter)
+        //    包含：骨骼层级、肌肉群、黄铜头骨与独眼、锅炉胸腔、双烟囱背包、
+        //          全身齿轮/液压活塞、五指分段巨掌、巨型蒸汽战锤与爆炸视图组件注册
+        // ============================================================================
+        class SteampunkCyclopsCharacter {
+            constructor(materials) {
+                // 公共根容器与控制器引用
+                this.publicRoot = new THREE.Group();
+                this.publicJoints = {};
+                this.publicAnimatedGears = [];
+                this.publicPistons = [];
+                this.publicExplodeItems = [];
+                this.publicChimneyTips = [];
+                this.publicSkeletonLines = null;
+
+                // 私有成员
+                this.m_Materials = materials;
+                this.m_GuideLineSegments = null;
+                this.m_GuideLineGeometry = null;
+                this.m_RestPose = new Map();
+
+                this.m_BuildCharacterHierarchy();
+                this.m_CaptureRestPoses();
+                this.m_BuildExplodeGuideLines();
+                this.m_BuildSkeletonVisualizer();
+            }
+
+            /**
+             * 创建程序化外露齿轮几何体
+             */
+            m_CreateGearMesh(outerRadius, innerRadius, thickness, teethCount, material) {
+                const shape = new THREE.Shape();
+                const step = (Math.PI * 2) / teethCount;
+                const rootR = outerRadius * 0.82;
+
+                for (let i = 0; i < teethCount; i++) {
+                    const a0 = i * step;
+                    const a1 = a0 + step * 0.22;
+                    const a2 = a0 + step * 0.32;
+                    const a3 = a0 + step * 0.68;
+                    const a4 = a0 + step * 0.78;
+
+                    if (i === 0) {
+                        shape.moveTo(Math.cos(a0) * rootR, Math.sin(a0) * rootR);
+                    } else {
+                        shape.lineTo(Math.cos(a0) * rootR, Math.sin(a0) * rootR);
+                    }
+                    shape.lineTo(Math.cos(a1) * rootR, Math.sin(a1) * rootR);
+                    shape.lineTo(Math.cos(a2) * outerRadius, Math.sin(a2) * outerRadius);
+                    shape.lineTo(Math.cos(a3) * outerRadius, Math.sin(a3) * outerRadius);
+                    shape.lineTo(Math.cos(a4) * rootR, Math.sin(a4) * rootR);
+                }
+                shape.closePath();
+
+                if (innerRadius > 0.01) {
+                    const hole = new THREE.Path();
+                    hole.absarc(0, 0, innerRadius, 0, Math.PI * 2, true);
+                    shape.holes.push(hole);
+                }
+
+                const extrudeSettings = {
+                    depth: thickness,
+                    bevelEnabled: true,
+                    bevelSegments: 2,
+                    steps: 1,
+                    bevelSize: thickness * 0.12,
+                    bevelThickness: thickness * 0.12
+                };
+
+                const geo = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+                geo.center();
+                const mesh = new THREE.Mesh(geo, material);
+                mesh.castShadow = true;
+                mesh.receiveShadow = true;
+                return mesh;
+            }
+
+            /**
+             * 注册可旋转齿轮
+             */
+            m_RegisterGear(mesh, axis = 'z', speedRatio = 1.0) {
+                this.publicAnimatedGears.push({
+                    mesh,
+                    axis,
+                    speedRatio
+                });
+                return mesh;
+            }
+
+            /**
+             * 注册可爆炸分离的部件
+             */
+            m_RegisterExplodePart(object3d, customDir = null, distanceScale = 1.6) {
+                object3d.updateMatrixWorld(true);
+                const baseLocalPos = object3d.position.clone();
+                this.publicExplodeItems.push({
+                    object3d,
+                    baseLocalPos,
+                    customDir: customDir ? customDir.clone().normalize() : null,
+                    distanceScale
+                });
+            }
+
+            /**
+             * 创建关节液压活塞组件（气缸套筒 + 活塞杆）
+             */
+            m_CreateHydraulicPiston(parentA, offsetA, parentB, offsetB, radius = 0.055) {
+                const cylGroup = new THREE.Group();
+                cylGroup.position.copy(offsetA);
+                parentA.add(cylGroup);
+
+                const rodGroup = new THREE.Group();
+                rodGroup.position.copy(offsetB);
+                parentB.add(rodGroup);
+
+                const barrelLen = 0.42;
+                const barrelGeo = new THREE.CylinderGeometry(radius, radius * 1.08, barrelLen, 12);
+                barrelGeo.translate(0, barrelLen * 0.5, 0);
+                barrelGeo.rotateX(Math.PI * 0.5);
+                const barrelMesh = new THREE.Mesh(barrelGeo, this.m_Materials.copper);
+                barrelMesh.castShadow = true;
+                cylGroup.add(barrelMesh);
+
+                // 铜箍细节
+                const collarGeo = new THREE.CylinderGeometry(radius * 1.28, radius * 1.28, 0.05, 12);
+                collarGeo.rotateX(Math.PI * 0.5);
+                const collarMesh = new THREE.Mesh(collarGeo, this.m_Materials.brass);
+                collarMesh.position.z = barrelLen;
+                cylGroup.add(collarMesh);
+
+                const rodLen = 0.48;
+                const rodGeo = new THREE.CylinderGeometry(radius * 0.58, radius * 0.58, rodLen, 10);
+                rodGeo.translate(0, rodLen * 0.5, 0);
+                rodGeo.rotateX(Math.PI * 0.5);
+                const rodMesh = new THREE.Mesh(rodGeo, this.m_Materials.bluedSteel);
+                rodMesh.castShadow = true;
+                rodGroup.add(rodMesh);
+
+                this.publicPistons.push({ cylGroup, rodGroup });
+            }
+
+            /**
+             * 添加铆钉阵列装饰
+             */
+            m_AddRivetsRing(parent, radius, yPos, count = 8, size = 0.025) {
+                const rivetGeo = new THREE.SphereGeometry(size, 8, 8);
+                for (let i = 0; i < count; i++) {
+                    const a = (i / count) * Math.PI * 2;
+                    const rivet = new THREE.Mesh(rivetGeo, this.m_Materials.brass);
+                    rivet.position.set(Math.cos(a) * radius, yPos, Math.sin(a) * radius);
+                    parent.add(rivet);
+                }
+            }
+
+            /**
+             * 构建完整角色骨骼与装备网格
+             */
+            m_BuildCharacterHierarchy() {
+                const mat = this.m_Materials;
+
+                // 1. 骨盆根节点 (Pelvis) - 离地高度约 2.15m
+                const pelvis = new THREE.Group();
+                pelvis.name = 'Pelvis';
+                pelvis.position.set(0, 2.15, 0);
+                this.publicRoot.add(pelvis);
+                this.publicJoints.pelvis = pelvis;
+
+                // 骨盆岩石躯干基底 + 裂纹皮革重型腰带
+                const pelvisCore = new THREE.Mesh(
+                    new THREE.CylinderGeometry(0.68, 0.56, 0.55, 16),
+                    mat.rockSkin
+                );
+                pelvisCore.scale.set(1.18, 1.0, 0.92);
+                pelvisCore.castShadow = true;
+                pelvisCore.receiveShadow = true;
+                pelvis.add(pelvisCore);
+
+                // 重型裂纹皮革腰带与黄铜扣件
+                const beltGroup = new THREE.Group();
+                pelvis.add(beltGroup);
+                const beltMesh = new THREE.Mesh(
+                    new THREE.CylinderGeometry(0.74, 0.68, 0.34, 20),
+                    mat.leather
+                );
+                beltMesh.scale.set(1.16, 1.0, 0.94);
+                beltMesh.castShadow = true;
+                beltGroup.add(beltMesh);
+                this.m_AddRivetsRing(beltGroup, 0.78, 0.08, 14, 0.032);
+                this.m_AddRivetsRing(beltGroup, 0.75, -0.08, 14, 0.032);
+
+                // 腰带中央蒸汽朋克齿轮徽章扣
+                const buckle = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.46, 0.38, 0.16),
+                    mat.brass
+                );
+                buckle.position.set(0, 0.0, 0.68);
+                buckle.castShadow = true;
+                beltGroup.add(buckle);
+                const buckleGear = this.m_CreateGearMesh(0.15, 0.04, 0.06, 10, mat.copper);
+                buckleGear.position.set(0, 0, 0.77);
+                beltGroup.add(this.m_RegisterGear(buckleGear, 'z', 1.5));
+                this.m_RegisterExplodePart(beltGroup, new THREE.Vector3(0, -0.2, 1), 1.4);
+
+                // 2. 脊椎与胸腔 (Spine -> Chest)
+                const spine = new THREE.Group();
+                spine.name = 'Spine';
+                spine.position.set(0, 0.28, 0);
+                pelvis.add(spine);
+                this.publicJoints.spine = spine;
+
+                // 腹部厚重岩石肌肉束
+                const absGroup = new THREE.Group();
+                spine.add(absGroup);
+                const abdomenRock = new THREE.Mesh(
+                    new THREE.CylinderGeometry(0.82, 0.66, 0.65, 16),
+                    mat.rockSkin
+                );
+                abdomenRock.position.y = 0.28;
+                abdomenRock.scale.set(1.15, 1, 0.92);
+                abdomenRock.castShadow = true;
+                absGroup.add(abdomenRock);
+
+                for (let row = 0; row < 2; row++) {
+                    for (let side of [-1, 1]) {
+                        const abMuscle = new THREE.Mesh(
+                            new THREE.DodecahedronGeometry(0.24, 1),
+                            mat.rockSkin
+                        );
+                        abMuscle.scale.set(1.2, 0.75, 0.8);
+                        abMuscle.position.set(side * 0.24, 0.18 + row * 0.24, 0.56);
+                        abMuscle.castShadow = true;
+                        absGroup.add(abMuscle);
+                    }
+                }
+                this.m_RegisterExplodePart(absGroup, new THREE.Vector3(0, 0, 0.8), 1.0);
+
+                // 胸腔主节点 (Chest)
+                const chest = new THREE.Group();
+                chest.name = 'Chest';
+                chest.position.set(0, 0.58, 0);
+                spine.add(chest);
+                this.publicJoints.chest = chest;
+
+                this.m_BuildTorsoAndBoiler(chest);
+                this.m_BuildBackpack(chest);
+                this.m_BuildHeadAndCyclopsEye(chest);
+
+                // 左右手臂与五指巨掌
+                this.m_BuildArm(chest, 'Left', -1);
+                this.m_BuildArm(chest, 'Right', 1);
+
+                // 右手巨型蒸汽战锤
+                this.m_BuildGiantSteamHammer(this.publicJoints.rightHand);
+
+                // 左右柱状双腿
+                this.m_BuildLeg(pelvis, 'Left', -1);
+                this.m_BuildLeg(pelvis, 'Right', 1);
+            }
+
+            /**
+             * 构建粗壮岩石躯干 + 外露胸腔锅炉结构（发光核心、啮合齿轮、压力表、铜制液压管）
+             */
+            m_BuildTorsoAndBoiler(chest) {
+                const mat = this.m_Materials;
+
+                // 粗壮岩石躯干主体
+                const torsoRockGroup = new THREE.Group();
+                chest.add(torsoRockGroup);
+
+                const mainTorso = new THREE.Mesh(
+                    new THREE.CylinderGeometry(1.12, 0.82, 1.25, 18),
+                    mat.rockSkin
+                );
+                mainTorso.position.set(0, 0.56, -0.04);
+                mainTorso.scale.set(1.22, 1.0, 0.92);
+                mainTorso.castShadow = true;
+                mainTorso.receiveShadow = true;
+                torsoRockGroup.add(mainTorso);
+
+                // 厚重的岩石胸大肌、斜方肌与背阔肌束
+                for (let side of [-1, 1]) {
+                    const pecMuscle = new THREE.Mesh(
+                        new THREE.DodecahedronGeometry(0.48, 2),
+                        mat.rockSkin
+                    );
+                    pecMuscle.scale.set(1.25, 0.85, 0.82);
+                    pecMuscle.position.set(side * 0.58, 0.76, 0.45);
+                    pecMuscle.castShadow = true;
+                    torsoRockGroup.add(pecMuscle);
+
+                    const trapMuscle = new THREE.Mesh(
+                        new THREE.DodecahedronGeometry(0.44, 2),
+                        mat.rockSkin
+                    );
+                    trapMuscle.scale.set(1.3, 0.85, 1.0);
+                    trapMuscle.position.set(side * 0.56, 1.16, -0.08);
+                    trapMuscle.castShadow = true;
+                    torsoRockGroup.add(trapMuscle);
+
+                    const latMuscle = new THREE.Mesh(
+                        new THREE.DodecahedronGeometry(0.52, 1),
+                        mat.rockSkin
+                    );
+                    latMuscle.scale.set(0.95, 1.25, 0.9);
+                    latMuscle.position.set(side * 0.86, 0.55, -0.15);
+                    latMuscle.castShadow = true;
+                    torsoRockGroup.add(latMuscle);
+                }
+
+                // 胸腔外露锅炉总成 (Boiler Cavity Assembly)
+                const boilerGroup = new THREE.Group();
+                boilerGroup.position.set(0, 0.56, 0.58);
+                chest.add(boilerGroup);
+
+                // 锅炉内胆暗钢腔体
+                const furnaceHousing = new THREE.Mesh(
+                    new THREE.CylinderGeometry(0.52, 0.46, 0.82, 18),
+                    mat.bluedSteel
+                );
+                furnaceHousing.rotation.x = Math.PI * 0.5;
+                furnaceHousing.position.z = -0.12;
+                boilerGroup.add(furnaceHousing);
+
+                // 发光能量核心 (Glowing Energy Core)
+                const coreMesh = new THREE.Mesh(
+                    new THREE.OctahedronGeometry(0.34, 3),
+                    mat.boilerCore
+                );
+                coreMesh.position.set(0, 0, 0.04);
+                boilerGroup.add(coreMesh);
+                this.publicJoints.boilerCore = coreMesh;
+
+                // 环绕锅炉的黄铜法兰护圈与铁艺炉栅
+                const flangeRing = new THREE.Mesh(
+                    new THREE.TorusGeometry(0.50, 0.065, 14, 28),
+                    mat.brass
+                );
+                flangeRing.position.z = 0.14;
+                flangeRing.castShadow = true;
+                boilerGroup.add(flangeRing);
+
+                for (let i = -2; i <= 2; i++) {
+                    const grateBar = new THREE.Mesh(
+                        new THREE.CylinderGeometry(0.026, 0.026, 0.92, 8),
+                        mat.rustedIron
+                    );
+                    grateBar.position.set(i * 0.16, 0, 0.22);
+                    grateBar.castShadow = true;
+                    boilerGroup.add(grateBar);
+                }
+
+                // 胸腔表面散布的啮合齿轮组 (Meshing Gears)
+                const gearSpecs = [
+                    { x: -0.46, y: 0.34, z: 0.20, r: 0.20, t: 12, spd: 1.4, mat: mat.brass },
+                    { x: -0.22, y: 0.46, z: 0.22, r: 0.13, t: 8,  spd: -2.1, mat: mat.copper },
+                    { x: 0.46,  y: -0.30, z: 0.20, r: 0.22, t: 14, spd: -1.2, mat: mat.brass },
+                    { x: 0.22,  y: -0.44, z: 0.22, r: 0.14, t: 9,  spd: 1.9, mat: mat.bluedSteel },
+                    { x: -0.48, y: -0.28, z: 0.18, r: 0.16, t: 10, spd: 1.6, mat: mat.copper }
+                ];
+                gearSpecs.forEach((g) => {
+                    const gear = this.m_CreateGearMesh(g.r, g.r * 0.28, 0.06, g.t, g.mat);
+                    gear.position.set(g.x, g.y, g.z);
+                    boilerGroup.add(this.m_RegisterGear(gear, 'z', g.spd));
+                });
+
+                // 胸前双压力表 (Pressure Gauges)
+                const gaugePositions = [
+                    new THREE.Vector3(0.48, 0.36, 0.18),
+                    new THREE.Vector3(-0.56, 0.04, 0.16)
+                ];
+                gaugePositions.forEach((pos) => {
+                    const gaugeBezel = new THREE.Group();
+                    gaugeBezel.position.copy(pos);
+                    const caseMesh = new THREE.Mesh(
+                        new THREE.CylinderGeometry(0.14, 0.14, 0.07, 16),
+                        mat.brass
+                    );
+                    caseMesh.rotation.x = Math.PI * 0.5;
+                    gaugeBezel.add(caseMesh);
+
+                    const faceMesh = new THREE.Mesh(
+                        new THREE.CircleGeometry(0.115, 16),
+                        mat.gaugeFace
+                    );
+                    faceMesh.position.z = 0.038;
+                    gaugeBezel.add(faceMesh);
+                    boilerGroup.add(gaugeBezel);
+                });
+
+                // 铜制液压弯管 (Copper Hydraulic Pipes)
+                for (let side of [-1, 1]) {
+                    const pipeCurve = new THREE.CatmullRomCurve3([
+                        new THREE.Vector3(side * 0.36, -0.35, 0.12),
+                        new THREE.Vector3(side * 0.78, -0.15, 0.22),
+                        new THREE.Vector3(side * 0.95, 0.35, 0.02),
+                        new THREE.Vector3(side * 0.72, 0.62, -0.35)
+                    ]);
+                    const pipeGeo = new THREE.TubeGeometry(pipeCurve, 20, 0.048, 10, false);
+                    const pipeMesh = new THREE.Mesh(pipeGeo, mat.copper);
+                    pipeMesh.castShadow = true;
+                    boilerGroup.add(pipeMesh);
+                }
+
+                this.m_RegisterExplodePart(boilerGroup, new THREE.Vector3(0, 0.1, 1), 1.85);
+            }
+
+            /**
+             * 构建背部双烟囱锅炉背包（侧面挂铜罐与排气管）
+             */
+            m_BuildBackpack(chest) {
+                const mat = this.m_Materials;
+                const backpack = new THREE.Group();
+                backpack.name = 'BoilerBackpack';
+                backpack.position.set(0, 0.62, -0.78);
+                chest.add(backpack);
+                this.publicJoints.backpack = backpack;
+
+                // 主高压蒸汽锅炉罐
+                const mainBoiler = new THREE.Mesh(
+                    new THREE.CylinderGeometry(0.56, 0.52, 1.18, 20),
+                    mat.rustedIron
+                );
+                mainBoiler.castShadow = true;
+                mainBoiler.receiveShadow = true;
+                backpack.add(mainBoiler);
+
+                // 上下黄铜封头与铆钉箍带
+                const topDome = new THREE.Mesh(
+                    new THREE.SphereGeometry(0.56, 20, 12, 0, Math.PI * 2, 0, Math.PI * 0.5),
+                    mat.brass
+                );
+                topDome.position.y = 0.58;
+                backpack.add(topDome);
+
+                const bottomDome = new THREE.Mesh(
+                    new THREE.SphereGeometry(0.52, 20, 12, 0, Math.PI * 2, Math.PI * 0.5, Math.PI * 0.5),
+                    mat.brass
+                );
+                bottomDome.position.y = -0.58;
+                backpack.add(bottomDome);
+
+                [-0.35, 0, 0.35].forEach((yOff) => {
+                    const band = new THREE.Mesh(
+                        new THREE.CylinderGeometry(0.58, 0.58, 0.07, 20),
+                        mat.brass
+                    );
+                    band.position.y = yOff;
+                    backpack.add(band);
+                    this.m_AddRivetsRing(backpack, 0.59, yOff, 12, 0.026);
+                });
+
+                // 背部外露大飞轮齿轮
+                const backFlywheel = this.m_CreateGearMesh(0.38, 0.14, 0.08, 16, mat.brass);
+                backFlywheel.position.set(0, 0.08, -0.58);
+                backpack.add(this.m_RegisterGear(backFlywheel, 'z', 1.1));
+
+                // 双烟囱 (Twin Smokestacks / Chimneys)
+                for (let side of [-1, 1]) {
+                    const stackGroup = new THREE.Group();
+                    stackGroup.position.set(side * 0.34, 0.75, -0.08);
+                    stackGroup.rotation.z = side * -0.14;
+                    stackGroup.rotation.x = -0.12;
+                    backpack.add(stackGroup);
+
+                    const pipe = new THREE.Mesh(
+                        new THREE.CylinderGeometry(0.15, 0.12, 1.05, 14),
+                        mat.rustedIron
+                    );
+                    pipe.position.y = 0.52;
+                    pipe.castShadow = true;
+                    stackGroup.add(pipe);
+
+                    const crown = new THREE.Mesh(
+                        new THREE.CylinderGeometry(0.20, 0.15, 0.18, 14),
+                        mat.brass
+                    );
+                    crown.position.y = 1.02;
+                    stackGroup.add(crown);
+
+                    // 记录烟囱排烟口位置用于蒸汽粒子发射
+                    const tipNode = new THREE.Object3D();
+                    tipNode.position.set(0, 1.14, 0);
+                    stackGroup.add(tipNode);
+                    this.publicChimneyTips.push(tipNode);
+
+                    // 侧面挂载的氧化铜储气罐 (Side Copper Canisters)
+                    const canister = new THREE.Group();
+                    canister.position.set(side * 0.68, -0.05, 0.06);
+                    backpack.add(canister);
+
+                    const tankBody = new THREE.Mesh(
+                        new THREE.CapsuleGeometry(0.18, 0.52, 8, 14),
+                        mat.copper
+                    );
+                    tankBody.castShadow = true;
+                    canister.add(tankBody);
+
+                    const strap = new THREE.Mesh(
+                        new THREE.CylinderGeometry(0.195, 0.195, 0.12, 14),
+                        mat.leather
+                    );
+                    canister.add(strap);
+
+                    // 侧面排气管路 (Exhaust Manifolds)
+                    for (let k = 0; k < 2; k++) {
+                        const exhaustPipe = new THREE.Mesh(
+                            new THREE.CylinderGeometry(0.045, 0.055, 0.62, 10),
+                            mat.bluedSteel
+                        );
+                        exhaustPipe.position.set(side * 0.18, -0.45 - k * 0.12, -0.22);
+                        exhaustPipe.rotation.z = side * 0.45;
+                        canister.add(exhaustPipe);
+                    }
+                    this.m_RegisterExplodePart(canister, new THREE.Vector3(side, 0, -0.5), 1.6);
+                }
+
+                this.m_RegisterExplodePart(backpack, new THREE.Vector3(0, 0.35, -1), 2.1);
+            }
+
+            /**
+             * 构建铰接式黄铜头骨、琥珀色独眼、黄铜眼眶环与头顶锈蚀装甲板
+             */
+            m_BuildHeadAndCyclopsEye(chest) {
+                const mat = this.m_Materials;
+
+                const neck = new THREE.Group();
+                neck.name = 'Neck';
+                neck.position.set(0, 1.26, 0.08);
+                chest.add(neck);
+                this.publicJoints.neck = neck;
+
+                // 颈部液压支柱与岩石颈肌
+                const neckCol = new THREE.Mesh(
+                    new THREE.CylinderGeometry(0.32, 0.40, 0.34, 14),
+                    mat.rockSkin
+                );
+                neckCol.position.y = 0.12;
+                neck.add(neckCol);
+
+                const head = new THREE.Group();
+                head.name = 'Head';
+                head.position.set(0, 0.24, 0.04);
+                neck.add(head);
+                this.publicJoints.head = head;
+
+                // 1. 铰接式黄铜头骨主体 (Articulated Brass Skull)
+                const craniumGroup = new THREE.Group();
+                head.add(craniumGroup);
+
+                const skullUpper = new THREE.Mesh(
+                    new THREE.SphereGeometry(0.48, 22, 18),
+                    mat.brass
+                );
+                skullUpper.scale.set(0.96, 1.05, 1.08);
+                skullUpper.position.set(0, 0.22, 0);
+                skullUpper.castShadow = true;
+                craniumGroup.add(skullUpper);
+
+                // 颧骨与侧面耳部齿轮轴
+                for (let side of [-1, 1]) {
+                    const cheekPlate = new THREE.Mesh(
+                        new THREE.BoxGeometry(0.16, 0.28, 0.42),
+                        mat.brass
+                    );
+                    cheekPlate.position.set(side * 0.42, 0.12, 0.12);
+                    cheekPlate.rotation.z = side * -0.15;
+                    craniumGroup.add(cheekPlate);
+
+                    const earGear = this.m_CreateGearMesh(0.16, 0.05, 0.06, 10, mat.copper);
+                    earGear.rotation.y = Math.PI * 0.5;
+                    earGear.position.set(side * 0.49, 0.18, -0.02);
+                    craniumGroup.add(this.m_RegisterGear(earGear, 'z', side * 1.3));
+                }
+
+                // 2. 头顶锈蚀装甲板 (Top Rusted Armor Crest Plates)
+                const crestGroup = new THREE.Group();
+                crestGroup.position.set(0, 0.56, -0.02);
+                head.add(crestGroup);
+
+                const domeArmor = new THREE.Mesh(
+                    new THREE.CylinderGeometry(0.38, 0.50, 0.24, 10, 1, false, 0, Math.PI),
+                    mat.rustedIron
+                );
+                domeArmor.rotation.z = Math.PI * 0.5;
+                domeArmor.rotation.y = Math.PI * 0.5;
+                domeArmor.scale.set(1.15, 1.0, 1.05);
+                domeArmor.castShadow = true;
+                crestGroup.add(domeArmor);
+
+                const ridgeFin = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.14, 0.22, 0.68),
+                    mat.rustedIron
+                );
+                ridgeFin.position.set(0, 0.15, -0.04);
+                crestGroup.add(ridgeFin);
+                this.m_AddRivetsRing(crestGroup, 0.42, -0.05, 8, 0.026);
+                this.m_RegisterExplodePart(crestGroup, new THREE.Vector3(0, 1, 0), 1.7);
+
+                // 3. 铰接式下颚 (Articulated Brass Jaw)
+                const jaw = new THREE.Group();
+                jaw.name = 'Jaw';
+                jaw.position.set(0, 0.02, -0.05);
+                head.add(jaw);
+                this.publicJoints.jaw = jaw;
+
+                const jawPlate = new THREE.Mesh(
+                    new THREE.CylinderGeometry(0.38, 0.30, 0.28, 8),
+                    mat.brass
+                );
+                jawPlate.position.set(0, -0.14, 0.22);
+                jawPlate.scale.set(1.1, 1.0, 1.15);
+                jawPlate.castShadow = true;
+                jaw.add(jawPlate);
+
+                // 下颚蒸汽格栅獠牙护齿
+                for (let i = -2; i <= 2; i++) {
+                    const tooth = new THREE.Mesh(
+                        new THREE.BoxGeometry(0.055, 0.14, 0.055),
+                        mat.bluedSteel
+                    );
+                    tooth.position.set(i * 0.11, -0.02, 0.48 - Math.abs(i) * 0.04);
+                    jaw.add(tooth);
+                }
+                this.m_RegisterExplodePart(jaw, new THREE.Vector3(0, -0.8, 0.6), 1.4);
+
+                // 4. 中央琥珀色巨大独眼与黄铜环眼眶 (Central Amber Cyclops Eye & Brass Rings)
+                const eyeAssembly = new THREE.Group();
+                eyeAssembly.position.set(0, 0.24, 0.44);
+                head.add(eyeAssembly);
+
+                // 外层黄铜眼眶环
+                const outerSocketRing = new THREE.Mesh(
+                    new THREE.TorusGeometry(0.24, 0.048, 14, 28),
+                    mat.brass
+                );
+                eyeAssembly.add(outerSocketRing);
+
+                // 内层可旋转机械快门齿环
+                const innerIrisGear = this.m_CreateGearMesh(0.22, 0.17, 0.05, 14, mat.copper);
+                innerIrisGear.position.z = 0.02;
+                eyeAssembly.add(this.m_RegisterGear(innerIrisGear, 'z', -0.8));
+
+                // 琥珀色玻璃独眼眼球节点（支持独立微动 Saccades）
+                const eyePivot = new THREE.Group();
+                eyePivot.name = 'EyeBall';
+                eyePivot.position.set(0, 0, -0.02);
+                eyeAssembly.add(eyePivot);
+                this.publicJoints.eyeBall = eyePivot;
+
+                const eyeSphere = new THREE.Mesh(
+                    new THREE.SphereGeometry(0.195, 28, 28),
+                    mat.amberEye
+                );
+                // 使 Canvas 纹理正面朝向 +Z
+                eyeSphere.rotation.y = -Math.PI * 0.5;
+                eyePivot.add(eyeSphere);
+
+                this.m_RegisterExplodePart(eyeAssembly, new THREE.Vector3(0, 0.2, 1), 1.9);
+            }
+
+            /**
+             * 构建单侧手臂：锈蚀金属肩甲、粗壮岩石肌肉、肘部齿轮与液压活塞、裂纹皮革护腕、分段式五指巨掌
+             */
+            m_BuildArm(chest, sideName, sign) {
+                const mat = this.m_Materials;
+                const prefix = sideName.toLowerCase();
+
+                // 肩关节 (Shoulder)
+                const shoulder = new THREE.Group();
+                shoulder.name = `${sideName}Shoulder`;
+                shoulder.position.set(sign * 1.32, 1.02, 0.0);
+                chest.add(shoulder);
+                this.publicJoints[`${prefix}Shoulder`] = shoulder;
+
+                // 肩部外露齿轮与三角肌
+                const deltoid = new THREE.Mesh(
+                    new THREE.DodecahedronGeometry(0.46, 2),
+                    mat.rockSkin
+                );
+                deltoid.scale.set(1.05, 1.1, 1.0);
+                deltoid.castShadow = true;
+                shoulder.add(deltoid);
+
+                const shoulderGear = this.m_CreateGearMesh(0.28, 0.08, 0.09, 12, mat.brass);
+                shoulderGear.rotation.y = Math.PI * 0.5;
+                shoulderGear.position.set(sign * 0.36, 0, 0);
+                shoulder.add(this.m_RegisterGear(shoulderGear, 'z', sign * 1.2));
+
+                // 锈蚀金属肩甲 (Rusted Metal Pauldron)
+                const pauldronGroup = new THREE.Group();
+                pauldronGroup.position.set(sign * 0.18, 0.22, 0);
+                shoulder.add(pauldronGroup);
+
+                for (let layer = 0; layer < 2; layer++) {
+                    const plate = new THREE.Mesh(
+                        new THREE.SphereGeometry(0.56 - layer * 0.06, 18, 14, 0, Math.PI * 1.15, 0, Math.PI * 0.58),
+                        mat.rustedIron
+                    );
+                    plate.rotation.z = sign * (-0.35 - layer * 0.22);
+                    plate.rotation.y = sign > 0 ? -0.4 : 2.1;
+                    plate.castShadow = true;
+                    pauldronGroup.add(plate);
+                }
+
+                // 肩甲黄铜包边与铆钉撞角
+                const spike = new THREE.Mesh(
+                    new THREE.ConeGeometry(0.09, 0.32, 8),
+                    mat.brass
+                );
+                spike.position.set(sign * 0.32, 0.42, 0);
+                spike.rotation.z = sign * -0.55;
+                pauldronGroup.add(spike);
+                this.m_RegisterExplodePart(pauldronGroup, new THREE.Vector3(sign, 0.85, 0), 1.9);
+
+                // 上臂与肱二头肌束 (Upper Arm)
+                const upperArm = new THREE.Group();
+                upperArm.position.set(sign * 0.14, -0.52, 0);
+                shoulder.add(upperArm);
+
+                const bicep = new THREE.Mesh(
+                    new THREE.CapsuleGeometry(0.33, 0.52, 10, 16),
+                    mat.rockSkin
+                );
+                bicep.castShadow = true;
+                upperArm.add(bicep);
+
+                // 肘关节 (Elbow)
+                const elbow = new THREE.Group();
+                elbow.name = `${sideName}Elbow`;
+                elbow.position.set(0, -0.48, 0);
+                upperArm.add(elbow);
+                this.publicJoints[`${prefix}Elbow`] = elbow;
+
+                // 肘部外露齿轮与铰链轴
+                const elbowAxle = new THREE.Mesh(
+                    new THREE.CylinderGeometry(0.22, 0.22, 0.68, 14),
+                    mat.bluedSteel
+                );
+                elbowAxle.rotation.z = Math.PI * 0.5;
+                elbow.add(elbowAxle);
+
+                const elbowGear = this.m_CreateGearMesh(0.24, 0.08, 0.07, 11, mat.brass);
+                elbowGear.rotation.y = Math.PI * 0.5;
+                elbowGear.position.set(sign * 0.36, 0, 0);
+                elbow.add(this.m_RegisterGear(elbowGear, 'z', sign * -1.6));
+
+                // 前臂巨型肌肉与裂纹皮革护腕 (Forearm & Leather Bracer)
+                const forearmGroup = new THREE.Group();
+                forearmGroup.position.set(0, -0.52, 0);
+                elbow.add(forearmGroup);
+
+                const forearmMuscle = new THREE.Mesh(
+                    new THREE.CylinderGeometry(0.36, 0.28, 0.85, 16),
+                    mat.rockSkin
+                );
+                forearmMuscle.castShadow = true;
+                forearmGroup.add(forearmMuscle);
+
+                const bracerGroup = new THREE.Group();
+                forearmGroup.add(bracerGroup);
+                const bracerLeather = new THREE.Mesh(
+                    new THREE.CylinderGeometry(0.39, 0.31, 0.62, 18),
+                    mat.leather
+                );
+                bracerLeather.position.y = -0.06;
+                bracerLeather.castShadow = true;
+                bracerGroup.add(bracerLeather);
+
+                // 护腕黄铜箍与铜管
+                [-0.26, 0.14].forEach((yRing) => {
+                    const cuffRing = new THREE.Mesh(
+                        new THREE.TorusGeometry(0.35, 0.035, 10, 20),
+                        mat.brass
+                    );
+                    cuffRing.rotation.x = Math.PI * 0.5;
+                    cuffRing.position.y = yRing;
+                    bracerGroup.add(cuffRing);
+                });
+                this.m_RegisterExplodePart(bracerGroup, new THREE.Vector3(sign, -0.2, 0.6), 1.5);
+
+                // 上臂至前臂的动态联动液压活塞
+                this.m_CreateHydraulicPiston(
+                    upperArm,
+                    new THREE.Vector3(sign * 0.22, 0.15, -0.26),
+                    elbow,
+                    new THREE.Vector3(sign * 0.22, -0.45, -0.24),
+                    0.055
+                );
+
+                // 腕关节与分段式五指巨掌 (Wrist & Segmented Five-Fingered Giant Hand)
+                const hand = new THREE.Group();
+                hand.name = `${sideName}Hand`;
+                hand.position.set(0, -0.52, 0);
+                forearmGroup.add(hand);
+                this.publicJoints[`${prefix}Hand`] = hand;
+
+                // 巨掌掌心岩石与黄铜背甲
+                const palm = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.34, 0.36, 0.44),
+                    mat.rockSkin
+                );
+                palm.position.set(0, -0.18, 0);
+                palm.castShadow = true;
+                hand.add(palm);
+
+                const handPlate = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.20, 0.32, 0.40),
+                    mat.rustedIron
+                );
+                handPlate.position.set(sign * 0.12, -0.18, 0);
+                hand.add(handPlate);
+
+                // 五指分段构建（拇指 + 食指/中指/无名指/小指，每指2节独立旋转骨骼）
+                const fingerroots = [];
+                const fingerZOffsets = [0.16, 0.05, -0.06, -0.16];
+                fingerZOffsets.forEach((zOff, idx) => {
+                    const fRoot = new THREE.Group();
+                    fRoot.position.set(0, -0.36, zOff);
+                    hand.add(fRoot);
+
+                    const seg1 = new THREE.Mesh(
+                        new THREE.CapsuleGeometry(0.055, 0.14, 6, 10),
+                        mat.rockSkin
+                    );
+                    seg1.position.y = -0.09;
+                    seg1.castShadow = true;
+                    fRoot.add(seg1);
+
+                    const knuckle = new THREE.Mesh(
+                        new THREE.SphereGeometry(0.062, 8, 8),
+                        mat.brass
+                    );
+                    fRoot.add(knuckle);
+
+                    const fDistal = new THREE.Group();
+                    fDistal.position.set(0, -0.18, 0);
+                    fRoot.add(fDistal);
+
+                    const seg2 = new THREE.Mesh(
+                        new THREE.CapsuleGeometry(0.048, 0.12, 6, 10),
+                        mat.brass
+                    );
+                    seg2.position.y = -0.08;
+                    seg2.castShadow = true;
+                    fDistal.add(seg2);
+
+                    fingerroots.push({ root: fRoot, distal: fDistal, isThumb: false, index: idx });
+                });
+
+                // 拇指 (Thumb)
+                const thumbRoot = new THREE.Group();
+                thumbRoot.position.set(sign * -0.12, -0.22, 0.22);
+                thumbRoot.rotation.x = 0.45;
+                hand.add(thumbRoot);
+
+                const tSeg1 = new THREE.Mesh(
+                    new THREE.CapsuleGeometry(0.062, 0.13, 6, 10),
+                    mat.rockSkin
+                );
+                tSeg1.position.y = -0.08;
+                thumbRoot.add(tSeg1);
+
+                const thumbDistal = new THREE.Group();
+                thumbDistal.position.set(0, -0.16, 0);
+                thumbRoot.add(thumbDistal);
+
+                const tSeg2 = new THREE.Mesh(
+                    new THREE.CapsuleGeometry(0.055, 0.11, 6, 10),
+                    mat.brass
+                );
+                tSeg2.position.y = -0.07;
+                thumbDistal.add(tSeg2);
+
+                fingerroots.push({ root: thumbRoot, distal: thumbDistal, isThumb: true, index: 4 });
+                this.publicJoints[`${prefix}Fingers`] = fingerroots;
+            }
+
+            /**
+             * 构建右手持握的巨型蒸汽战锤（带发光核心、排气管与机械齿轮）
+             */
+            m_BuildGiantSteamHammer(rightHand) {
+                const mat = this.m_Materials;
+
+                const hammerGroup = new THREE.Group();
+                hammerGroup.name = 'SteamHammer';
+                // 嵌入右手掌心并朝向正前方 (+Z)
+                hammerGroup.position.set(-0.06, -0.24, 0.02);
+                rightHand.add(hammerGroup);
+                this.publicJoints.hammer = hammerGroup;
+
+                // 长柄主轴（沿 Z 轴延伸）
+                const shaftLength = 3.35;
+                const shaftMesh = new THREE.Mesh(
+                    new THREE.CylinderGeometry(0.085, 0.095, shaftLength, 16),
+                    mat.bluedSteel
+                );
+                shaftMesh.rotation.x = Math.PI * 0.5;
+                shaftMesh.position.z = 0.65;
+                shaftMesh.castShadow = true;
+                hammerGroup.add(shaftMesh);
+
+                // 皮革防滑握把缠绕
+                const gripMesh = new THREE.Mesh(
+                    new THREE.CylinderGeometry(0.105, 0.105, 1.35, 16),
+                    mat.leather
+                );
+                gripMesh.rotation.x = Math.PI * 0.5;
+                gripMesh.position.z = 0.15;
+                hammerGroup.add(gripMesh);
+
+                // 柄尾黄铜配重球
+                const pommel = new THREE.Mesh(
+                    new THREE.DodecahedronGeometry(0.18, 1),
+                    mat.brass
+                );
+                pommel.position.z = -1.05;
+                hammerGroup.add(pommel);
+
+                // 锤头总成 (Hammerhead Assembly)
+                const headGroup = new THREE.Group();
+                headGroup.position.set(0, 0, 2.15);
+                hammerGroup.add(headGroup);
+
+                // 锤头中央锈蚀铁甲炉体
+                const headBody = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.68, 1.48, 0.78),
+                    mat.rustedIron
+                );
+                headBody.castShadow = true;
+                headBody.receiveShadow = true;
+                headGroup.add(headBody);
+
+                // 上下双巨型冲击锤面（黄铜法兰 + 棱台撞击面）
+                for (let dir of [-1, 1]) {
+                    const faceCollar = new THREE.Mesh(
+                        new THREE.CylinderGeometry(0.42, 0.46, 0.24, 12),
+                        mat.brass
+                    );
+                    faceCollar.position.y = dir * 0.82;
+                    faceCollar.castShadow = true;
+                    headGroup.add(faceCollar);
+
+                    const strikeHead = new THREE.Mesh(
+                        new THREE.CylinderGeometry(0.50, 0.42, 0.26, 8),
+                        mat.bluedSteel
+                    );
+                    strikeHead.position.y = dir * 1.02;
+                    strikeHead.castShadow = true;
+                    headGroup.add(strikeHead);
+                }
+
+                // 锤头内部发光蒸汽核心 (Hammer Glowing Core)
+                const hammerCoreMesh = new THREE.Mesh(
+                    new THREE.CylinderGeometry(0.28, 0.28, 0.86, 16),
+                    mat.hammerCore
+                );
+                headGroup.add(hammerCoreMesh);
+                this.publicJoints.hammerCore = hammerCoreMesh;
+
+                // 两侧外露齿轮与防护格栅窗
+                for (let side of [-1, 1]) {
+                    const windowFrame = new THREE.Mesh(
+                        new THREE.TorusGeometry(0.25, 0.045, 10, 20),
+                        mat.brass
+                    );
+                    windowFrame.rotation.y = Math.PI * 0.5;
+                    windowFrame.position.x = side * 0.35;
+                    headGroup.add(windowFrame);
+
+                    const sideGear = this.m_CreateGearMesh(0.24, 0.08, 0.07, 12, mat.copper);
+                    sideGear.rotation.y = Math.PI * 0.5;
+                    sideGear.position.set(side * 0.36, 0.42, 0.25);
+                    headGroup.add(this.m_RegisterGear(sideGear, 'z', side * 2.0));
+
+                    // 锤头蒸汽泄压短管
+                    const ventPipe = new THREE.Mesh(
+                        new THREE.CylinderGeometry(0.06, 0.08, 0.38, 10),
+                        mat.copper
+                    );
+                    ventPipe.position.set(side * 0.32, -0.35, -0.38);
+                    ventPipe.rotation.x = -0.5;
+                    ventPipe.rotation.z = side * -0.4;
+                    headGroup.add(ventPipe);
+                }
+
+                this.m_RegisterExplodePart(headGroup, new THREE.Vector3(0, 0.4, 1), 2.2);
+            }
+
+            /**
+             * 构建柱状双腿：髋/膝齿轮与液压活塞、岩石大腿、重型装甲战靴
+             */
+            m_BuildLeg(pelvis, sideName, sign) {
+                const mat = this.m_Materials;
+                const prefix = sideName.toLowerCase();
+
+                // 髋关节 (Hip)
+                const hip = new THREE.Group();
+                hip.name = `${sideName}Hip`;
+                hip.position.set(sign * 0.54, -0.14, 0);
+                pelvis.add(hip);
+                this.publicJoints[`${prefix}Hip`] = hip;
+
+                // 髋部外露大齿轮
+                const hipGear = this.m_CreateGearMesh(0.25, 0.08, 0.08, 12, mat.brass);
+                hipGear.rotation.y = Math.PI * 0.5;
+                hipGear.position.set(sign * 0.38, 0, 0);
+                hip.add(this.m_RegisterGear(hipGear, 'z', sign * 1.1));
+
+                // 大腿岩石肌肉与外侧铁甲护板 (Thigh)
+                const thigh = new THREE.Mesh(
+                    new THREE.CylinderGeometry(0.42, 0.35, 0.96, 16),
+                    mat.rockSkin
+                );
+                thigh.position.y = -0.46;
+                thigh.castShadow = true;
+                thigh.receiveShadow = true;
+                hip.add(thigh);
+
+                const thighArmor = new THREE.Mesh(
+                    new THREE.CylinderGeometry(0.45, 0.38, 0.68, 12, 1, false, -Math.PI * 0.45, Math.PI * 0.9),
+                    mat.rustedIron
+                );
+                thighArmor.rotation.y = sign * Math.PI * 0.5;
+                thighArmor.position.y = -0.44;
+                thighArmor.castShadow = true;
+                hip.add(thighArmor);
+                this.m_RegisterExplodePart(thighArmor, new THREE.Vector3(sign, 0, 0.5), 1.5);
+
+                // 膝关节 (Knee)
+                const knee = new THREE.Group();
+                knee.name = `${sideName}Knee`;
+                knee.position.set(0, -0.95, 0);
+                hip.add(knee);
+                this.publicJoints[`${prefix}Knee`] = knee;
+
+                // 膝盖黄铜护膝罩与双侧齿轮
+                const kneeCap = new THREE.Mesh(
+                    new THREE.DodecahedronGeometry(0.28, 1),
+                    mat.brass
+                );
+                kneeCap.scale.set(1.0, 1.15, 0.85);
+                kneeCap.position.set(0, 0.04, 0.32);
+                kneeCap.castShadow = true;
+                knee.add(kneeCap);
+                this.m_RegisterExplodePart(kneeCap, new THREE.Vector3(0, 0.2, 1), 1.6);
+
+                const kneeGear = this.m_CreateGearMesh(0.22, 0.06, 0.07, 10, mat.copper);
+                kneeGear.rotation.y = Math.PI * 0.5;
+                kneeGear.position.set(sign * 0.35, 0, 0);
+                knee.add(this.m_RegisterGear(kneeGear, 'z', sign * -1.4));
+
+                // 柱状小腿 (Columnar Shin / Lower Leg)
+                const shinGroup = new THREE.Group();
+                shinGroup.position.set(0, -0.52, 0);
+                knee.add(shinGroup);
+
+                const shinPillar = new THREE.Mesh(
+                    new THREE.CylinderGeometry(0.38, 0.44, 0.92, 16),
+                    mat.rustedIron
+                );
+                shinPillar.castShadow = true;
+                shinPillar.receiveShadow = true;
+                shinGroup.add(shinPillar);
+
+                const shinTrim = new THREE.Mesh(
+                    new THREE.CylinderGeometry(0.45, 0.46, 0.16, 16),
+                    mat.brass
+                );
+                shinTrim.position.y = -0.36;
+                shinGroup.add(shinTrim);
+
+                // 大腿后侧至小腿后侧的动态液压活塞
+                this.m_CreateHydraulicPiston(
+                    hip,
+                    new THREE.Vector3(0, -0.38, -0.34),
+                    knee,
+                    new THREE.Vector3(0, -0.55, -0.34),
+                    0.06
+                );
+
+                // 踝关节与重型蒸汽战靴 (Ankle & Foot)
+                const ankle = new THREE.Group();
+                ankle.name = `${sideName}Ankle`;
+                ankle.position.set(0, -0.46, 0);
+                shinGroup.add(ankle);
+                this.publicJoints[`${prefix}Ankle`] = ankle;
+
+                const bootBase = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.64, 0.28, 0.98),
+                    mat.rustedIron
+                );
+                bootBase.position.set(0, -0.12, 0.16);
+                bootBase.castShadow = true;
+                bootBase.receiveShadow = true;
+                ankle.add(bootBase);
+
+                const toeCap = new THREE.Mesh(
+                    new THREE.CylinderGeometry(0.32, 0.35, 0.64, 12, 1, false, 0, Math.PI),
+                    mat.brass
+                );
+                toeCap.rotation.z = Math.PI * 0.5;
+                toeCap.position.set(0, -0.16, 0.58);
+                toeCap.castShadow = true;
+                ankle.add(toeCap);
+            }
+
+            /**
+             * 记录所有关节初始基准姿态 (Rest Pose)
+             */
+            m_CaptureRestPoses() {
+                Object.entries(this.publicJoints).forEach(([key, node]) => {
+                    if (node && node.isObject3D) {
+                        this.m_RestPose.set(key, {
+                            pos: node.position.clone(),
+                            rot: node.rotation.clone(),
+                            scale: node.scale.clone()
+                        });
+                    }
+                });
+            }
+
+            /**
+             * 构建爆炸视图青色引导线 (Cyan Explode Guide Lines)
+             */
+            m_BuildExplodeGuideLines() {
+                const count = this.publicExplodeItems.length;
+                const positions = new Float32Array(count * 2 * 3);
+                this.m_GuideLineGeometry = new THREE.BufferGeometry();
+                this.m_GuideLineGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+                const lineMat = new THREE.LineBasicMaterial({
+                    color: 0x00ffff,
+                    transparent: true,
+                    opacity: 0.88,
+                    depthTest: true
+                });
+
+                this.m_GuideLineSegments = new THREE.LineSegments(this.m_GuideLineGeometry, lineMat);
+                this.m_GuideLineSegments.visible = false;
+                this.m_GuideLineSegments.frustumCulled = false;
+                this.publicRoot.add(this.m_GuideLineSegments);
+            }
+
+            /**
+             * 构建骨骼与关节辅助可视化器 (Show Skeleton Helper)
+             */
+            m_BuildSkeletonVisualizer() {
+                const bonePairs = [
+                    ['pelvis', 'spine'],
+                    ['spine', 'chest'],
+                    ['chest', 'neck'],
+                    ['neck', 'head'],
+                    ['head', 'eyeBall'],
+                    ['head', 'jaw'],
+                    ['chest', 'backpack'],
+                    ['chest', 'leftShoulder'],
+                    ['leftShoulder', 'leftElbow'],
+                    ['leftElbow', 'leftHand'],
+                    ['leftHand', 'hammer'],
+                    ['chest', 'rightShoulder'],
+                    ['rightShoulder', 'rightElbow'],
+                    ['rightElbow', 'rightHand'],
+                    ['rightHand', 'hammer'],
+                    ['pelvis', 'leftHip'],
+                    ['leftHip', 'leftKnee'],
+                    ['leftKnee', 'leftAnkle'],
+                    ['pelvis', 'rightHip'],
+                    ['rightHip', 'rightKnee'],
+                    ['rightKnee', 'rightAnkle']
+                ];
+
+                const positions = new Float32Array(bonePairs.length * 2 * 3);
+                const geo = new THREE.BufferGeometry();
+                geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+                const mat = new THREE.LineBasicMaterial({
+                    color: 0x38bdf8,
+                    depthTest: false,
+                    transparent: true,
+                    opacity: 0.95
+                });
+
+                this.publicSkeletonLines = new THREE.LineSegments(geo, mat);
+                this.publicSkeletonLines.visible = false;
+                this.publicSkeletonLines.renderOrder = 999;
+                this.publicSkeletonLines.frustumCulled = false;
+                this.publicSkeletonLines.userData.pairs = bonePairs;
+                this.publicRoot.add(this.publicSkeletonLines);
+            }
+
+            /**
+             * 实时更新液压活塞对准、爆炸视图分离与青色引导线
+             */
+            updateMechanicsAndExplode(dt, gearSpeed, explodeAmount, explodeAxis) {
+                // 1. 先恢复所有爆炸部件到原始局部坐标，以便骨骼动画正确计算
+                for (let i = 0; i < this.publicExplodeItems.length; i++) {
+                    const item = this.publicExplodeItems[i];
+                    item.object3d.position.copy(item.baseLocalPos);
+                }
+
+                // 2. 旋转全身啮合齿轮
+                for (let i = 0; i < this.publicAnimatedGears.length; i++) {
+                    const g = this.publicAnimatedGears[i];
+                    g.mesh.rotation[g.axis] += dt * g.speedRatio * gearSpeed * 2.2;
+                }
+
+                this.publicRoot.updateMatrixWorld(true);
+
+                // 3. 更新关节液压活塞伸缩对准
+                const worldA = new THREE.Vector3();
+                const worldB = new THREE.Vector3();
+                for (let i = 0; i < this.publicPistons.length; i++) {
+                    const p = this.publicPistons[i];
+                    p.cylGroup.getWorldPosition(worldA);
+                    p.rodGroup.getWorldPosition(worldB);
+                    p.cylGroup.lookAt(worldB);
+                    p.rodGroup.lookAt(worldA);
+                }
+
+                // 4. 计算爆炸视图位移与青色动态引导线
+                if (explodeAmount > 0.001) {
+                    this.m_GuideLineSegments.visible = true;
+                    const posAttr = this.m_GuideLineGeometry.attributes.position;
+                    const centerWorld = new THREE.Vector3(0, 2.5, 0);
+                    const originWorld = new THREE.Vector3();
+                    const targetWorld = new THREE.Vector3();
+                    const dirVec = new THREE.Vector3();
+                    const parentInv = new THREE.Matrix4();
+
+                    for (let i = 0; i < this.publicExplodeItems.length; i++) {
+                        const item = this.publicExplodeItems[i];
+                        const obj = item.object3d;
+                        obj.getWorldPosition(originWorld);
+
+                        // 根据所选爆炸轴计算世界空间分离向量
+                        if (explodeAxis === 'Radial') {
+                            dirVec.subVectors(originWorld, centerWorld);
+                            if (dirVec.lengthSq() < 0.001) {
+                                dirVec.set(0, 1, 0);
+                            } else {
+                                dirVec.normalize();
+                            }
+                            if (item.customDir) {
+                                dirVec.lerp(item.customDir, 0.55).normalize();
+                            }
+                        } else if (explodeAxis === 'X') {
+                            const signX = Math.abs(originWorld.x) > 0.08
+                                ? Math.sign(originWorld.x)
+                                : (item.customDir && Math.abs(item.customDir.x) > 0.05 ? Math.sign(item.customDir.x) : (i % 2 === 0 ? 1 : -1));
+                            dirVec.set(signX, (originWorld.y - 2.5) * 0.12, 0).normalize();
+                        } else if (explodeAxis === 'Y') {
+                            const signY = originWorld.y >= 2.35 ? 1 : -1;
+                            dirVec.set((originWorld.x) * 0.15, signY, (originWorld.z) * 0.15).normalize();
+                        } else if (explodeAxis === 'Z') {
+                            const signZ = originWorld.z >= 0 ? 1 : -1;
+                            dirVec.set(0, (originWorld.y - 2.5) * 0.12, signZ).normalize();
+                        }
+
+                        const dist = explodeAmount * item.distanceScale * 1.65;
+                        targetWorld.copy(originWorld).addScaledVector(dirVec, dist);
+
+                        // 转换回父节点局部空间
+                        if (obj.parent) {
+                            parentInv.copy(obj.parent.matrixWorld).invert();
+                            const localTarget = targetWorld.clone().applyMatrix4(parentInv);
+                            obj.position.copy(localTarget);
+                            obj.updateMatrixWorld(true);
+                        }
+
+                        // 更新青色引导线两端坐标（转换到 publicRoot 局部空间）
+                        const rootInv = new THREE.Matrix4().copy(this.publicRoot.matrixWorld).invert();
+                        const p0 = originWorld.clone().applyMatrix4(rootInv);
+                        const p1 = targetWorld.clone().applyMatrix4(rootInv);
+
+                        posAttr.setXYZ(i * 2, p0.x, p0.y, p0.z);
+                        posAttr.setXYZ(i * 2 + 1, p1.x, p1.y, p1.z);
+                    }
+                    posAttr.needsUpdate = true;
+                } else {
+                    this.m_GuideLineSegments.visible = false;
+                }
+
+                // 5. 更新骨骼可视化辅助线
+                if (this.publicSkeletonLines.visible) {
+                    const skelPos = this.publicSkeletonLines.geometry.attributes.position;
+                    const pairs = this.publicSkeletonLines.userData.pairs;
+                    const rootInv = new THREE.Matrix4().copy(this.publicRoot.matrixWorld).invert();
+                    const pA = new THREE.Vector3();
+                    const pB = new THREE.Vector3();
+
+                    for (let i = 0; i < pairs.length; i++) {
+                        const [kA, kB] = pairs[i];
+                        const nA = this.publicJoints[kA];
+                        const nB = this.publicJoints[kB];
+                        if (nA && nB) {
+                            nA.getWorldPosition(pA).applyMatrix4(rootInv);
+                            nB.getWorldPosition(pB).applyMatrix4(rootInv);
+                            skelPos.setXYZ(i * 2, pA.x, pA.y, pA.z);
+                            skelPos.setXYZ(i * 2 + 1, pB.x, pB.y, pB.z);
+                        }
+                    }
+                    skelPos.needsUpdate = true;
+                }
+            }
+
+            getRestPose(jointName) {
+                return this.m_RestPose.get(jointName);
+            }
+        }
+
+        // ============================================================================
+        // 3. 游戏动作状态机 (CyclopsAnimationController)
+        //    支持 14 个动作状态、平滑插值过渡、循环/非循环自动回待机、独眼微动与核心闪烁
+        // ============================================================================
+        class CyclopsAnimationController {
+            constructor(character, materials, onStateChangeCallback) {
+                // 公共状态属性 (遵循小驼峰规范)
+                this.publicCurrentState = 'Idle';
+                this.publicAnimProgress = 0;
+                this.publicStateCatalog = [
+                    { id: 'Idle',        label: '待机呼吸 (Idle)',       loop: true,  duration: 3.2 },
+                    { id: 'Walk',        label: '行走 (Walk)',           loop: true,  duration: 1.5 },
+                    { id: 'Run',         label: '奔跑 (Run)',            loop: true,  duration: 0.85 },
+                    { id: 'Jump',        label: '跳跃 (Jump)',           loop: false, duration: 1.15, nextState: 'Land' },
+                    { id: 'Land',        label: '落地缓冲 (Land)',       loop: false, duration: 0.75, nextState: 'Idle' },
+                    { id: 'HammerSmash', label: '重锤砸击 (HammerSmash)',loop: false, duration: 1.65, nextState: 'Idle' },
+                    { id: 'Sweep',       label: '重锤横扫 (Sweep)',      loop: false, duration: 1.45, nextState: 'Idle' },
+                    { id: 'Throw',       label: '投掷战锤 (Throw)',      loop: false, duration: 1.85, nextState: 'Idle' },
+                    { id: 'Hit',         label: '受击硬直 (Hit)',        loop: false, duration: 0.85, nextState: 'Idle' },
+                    { id: 'Stun',        label: '眩晕摇晃 (Stun)',       loop: true,  duration: 2.4 },
+                    { id: 'Taunt',       label: '捶胸嘲讽 (Taunt)',      loop: false, duration: 2.1,  nextState: 'Idle' },
+                    { id: 'Roar',        label: '狂暴咆哮 (Roar)',       loop: false, duration: 2.3,  nextState: 'Idle' },
+                    { id: 'Cast',        label: '蒸汽施法 (Cast)',       loop: false, duration: 2.2,  nextState: 'Idle' },
+                    { id: 'Death',       label: '力竭倒地 (Death)',      loop: false, duration: 2.7,  nextState: 'Idle' }
+                ];
+
+                // 私有成员 (遵循 m_ + 大驼峰规范)
+                this.m_Character = character;
+                this.m_Materials = materials;
+                this.m_OnStateChange = onStateChangeCallback;
+                this.m_StateTime = 0;
+                this.m_TotalTime = 0;
+                this.m_SaccadeTimer = 0;
+                this.m_TargetEyeYaw = 0;
+                this.m_TargetEyePitch = 0;
+                this.m_CurrentEyeYaw = 0;
+                this.m_CurrentEyePitch = 0;
+            }
+
+            /**
+             * 切换动作状态
+             */
+            setAnimationState(stateId) {
+                const found = this.publicStateCatalog.find((s) => s.id === stateId);
+                if (!found) return;
+                this.publicCurrentState = stateId;
+                this.m_StateTime = 0;
+                this.publicAnimProgress = 0;
+                if (this.m_OnStateChange) {
+                    this.m_OnStateChange(found);
+                }
+            }
+
+            /**
+             * 计算目标姿势字典
+             */
+            m_ComputeTargetPose(stateId, t, normP) {
+                const pose = {
+                    pelvisPos: new THREE.Vector3(0, 2.15, 0),
+                    pelvisRot: new THREE.Euler(0, 0, 0),
+                    spineRot: new THREE.Euler(0, 0, 0),
+                    chestRot: new THREE.Euler(0, 0, 0),
+                    neckRot: new THREE.Euler(0, 0, 0),
+                    headRot: new THREE.Euler(0, 0, 0),
+                    jawRotX: 0,
+                    leftShoulderRot: new THREE.Euler(0, 0, 0.12),
+                    leftElbowRot: new THREE.Euler(-0.35, 0, 0),
+                    leftHandRot: new THREE.Euler(0, 0, 0),
+                    leftFingerCurl: 0.35,
+                    rightShoulderRot: new THREE.Euler(0.15, 0, -0.14),
+                    rightElbowRot: new THREE.Euler(-0.65, 0, 0),
+                    rightHandRot: new THREE.Euler(0, 0, 0),
+                    rightFingerCurl: 0.92,
+                    hammerPosOffset: new THREE.Vector3(0, 0, 0),
+                    hammerRotOffset: new THREE.Euler(0, 0, 0),
+                    leftHipRot: new THREE.Euler(0, 0, 0),
+                    leftKneeRot: new THREE.Euler(0, 0, 0),
+                    leftAnkleRot: new THREE.Euler(0, 0, 0),
+                    rightHipRot: new THREE.Euler(0, 0, 0),
+                    rightKneeRot: new THREE.Euler(0, 0, 0),
+                    rightAnkleRot: new THREE.Euler(0, 0, 0),
+                    coreBoost: 1.0
+                };
+
+                const tau = Math.PI * 2;
+
+                switch (stateId) {
+                    case 'Idle': {
+                        const b = Math.sin(t * 2.1);
+                        const b2 = Math.cos(t * 2.1);
+                        pose.pelvisPos.y = 2.15 + b * 0.035;
+                        pose.spineRot.x = 0.04 + b * 0.03;
+                        pose.chestRot.x = 0.03 - b * 0.04;
+                        pose.headRot.y = Math.sin(t * 0.9) * 0.12;
+                        pose.headRot.x = b2 * 0.04;
+                        pose.jawRotX = 0.05 + Math.max(0, b) * 0.06;
+                        pose.leftShoulderRot.set(b * 0.05, 0, 0.14 + b * 0.03);
+                        pose.rightShoulderRot.set(0.18 + b * 0.05, 0, -0.15 - b * 0.03);
+                        break;
+                    }
+
+                    case 'Walk': {
+                        const phase = normP * tau;
+                        const s = Math.sin(phase);
+                        const c = Math.cos(phase);
+                        pose.pelvisPos.y = 2.12 + Math.abs(s) * 0.09;
+                        pose.pelvisRot.z = c * 0.05;
+                        pose.pelvisRot.y = -s * 0.08;
+                        pose.spineRot.x = 0.08;
+                        pose.chestRot.y = s * 0.14;
+                        pose.headRot.y = -s * 0.08;
+
+                        pose.leftHipRot.x = s * 0.58;
+                        pose.leftKneeRot.x = Math.max(0, -s) * 0.82 + 0.08;
+                        pose.leftAnkleRot.x = -pose.leftHipRot.x * 0.35;
+
+                        pose.rightHipRot.x = -s * 0.58;
+                        pose.rightKneeRot.x = Math.max(0, s) * 0.82 + 0.08;
+                        pose.rightAnkleRot.x = -pose.rightHipRot.x * 0.35;
+
+                        pose.leftShoulderRot.set(-s * 0.45, 0, 0.15);
+                        pose.leftElbowRot.x = -0.45 - Math.max(0, s) * 0.3;
+                        pose.rightShoulderRot.set(s * 0.35 + 0.15, 0, -0.18);
+                        pose.rightElbowRot.x = -0.75;
+                        break;
+                    }
+
+                    case 'Run': {
+                        const phase = normP * tau;
+                        const s = Math.sin(phase);
+                        const c = Math.cos(phase);
+                        pose.pelvisPos.y = 2.08 + Math.abs(c) * 0.19;
+                        pose.pelvisRot.x = 0.18;
+                        pose.pelvisRot.y = -s * 0.15;
+                        pose.spineRot.x = 0.18 + Math.abs(s) * 0.06;
+                        pose.chestRot.y = s * 0.24;
+                        pose.headRot.x = -0.22;
+                        pose.jawRotX = 0.18;
+
+                        pose.leftHipRot.x = s * 0.95;
+                        pose.leftKneeRot.x = Math.max(0, -s) * 1.35 + 0.15;
+                        pose.rightHipRot.x = -s * 0.95;
+                        pose.rightKneeRot.x = Math.max(0, s) * 1.35 + 0.15;
+
+                        pose.leftShoulderRot.set(-s * 0.85, 0, 0.22);
+                        pose.leftElbowRot.x = -1.05;
+                        pose.rightShoulderRot.set(s * 0.68 + 0.2, 0, -0.24);
+                        pose.rightElbowRot.x = -0.95;
+                        pose.coreBoost = 1.45;
+                        break;
+                    }
+
+                    case 'Jump': {
+                        // 0.0 - 0.28 蓄力下蹲，0.28 - 1.0 腾空跃起
+                        if (normP < 0.28) {
+                            const k = normP / 0.28;
+                            pose.pelvisPos.y = 2.15 - k * 0.58;
+                            pose.spineRot.x = k * 0.38;
+                            pose.leftHipRot.x = -k * 0.75;
+                            pose.leftKneeRot.x = k * 1.25;
+                            pose.rightHipRot.x = -k * 0.75;
+                            pose.rightKneeRot.x = k * 1.25;
+                            pose.leftShoulderRot.x = k * 0.65;
+                            pose.rightShoulderRot.x = k * 0.65;
+                        } else {
+                            const airP = (normP - 0.28) / 0.72;
+                            const arc = Math.sin(airP * Math.PI);
+                            pose.pelvisPos.y = 1.57 + arc * 1.75;
+                            pose.spineRot.x = -0.15 * arc;
+                            pose.leftHipRot.x = -0.35 * arc;
+                            pose.leftKneeRot.x = 0.65 * arc;
+                            pose.rightHipRot.x = 0.22 * arc;
+                            pose.rightKneeRot.x = 0.45 * arc;
+                            pose.leftShoulderRot.set(-1.35 * arc, 0, 0.38);
+                            pose.rightShoulderRot.set(-1.15 * arc, 0, -0.35);
+                            pose.coreBoost = 1.6;
+                        }
+                        break;
+                    }
+
+                    case 'Land': {
+                        const impact = Math.sin(normP * Math.PI);
+                        pose.pelvisPos.y = 2.15 - impact * 0.68;
+                        pose.spineRot.x = impact * 0.48;
+                        pose.chestRot.x = impact * 0.25;
+                        pose.headRot.x = impact * 0.35;
+                        pose.leftHipRot.x = -impact * 0.85;
+                        pose.leftKneeRot.x = impact * 1.38;
+                        pose.rightHipRot.x = -impact * 0.85;
+                        pose.rightKneeRot.x = impact * 1.38;
+                        pose.leftShoulderRot.set(impact * 0.45, 0, 0.48);
+                        pose.rightShoulderRot.set(impact * 0.55, 0, -0.45);
+                        break;
+                    }
+
+                    case 'HammerSmash': {
+                        // 高举巨锤 -> 毁灭性下砸 -> 拔锤回位
+                        if (normP < 0.42) {
+                            const w = THREE.MathUtils.smoothstep(normP, 0, 0.42);
+                            pose.pelvisPos.y = 2.15 + w * 0.14;
+                            pose.spineRot.x = -w * 0.32;
+                            pose.chestRot.y = -w * 0.38;
+                            pose.headRot.x = -w * 0.28;
+                            pose.jawRotX = w * 0.38;
+                            pose.rightShoulderRot.set(-w * 2.35, 0, -0.28);
+                            pose.rightElbowRot.x = -0.35;
+                            pose.leftShoulderRot.set(-w * 1.65, w * 0.45, 0.22);
+                            pose.leftHipRot.x = -w * 0.38;
+                            pose.rightHipRot.x = w * 0.28;
+                            pose.coreBoost = 1.0 + w * 1.2;
+                        } else if (normP < 0.62) {
+                            const s = THREE.MathUtils.smoothstep(normP, 0.42, 0.62);
+                            pose.pelvisPos.y = THREE.MathUtils.lerp(2.29, 1.65, s);
+                            pose.spineRot.x = THREE.MathUtils.lerp(-0.32, 0.58, s);
+                            pose.chestRot.y = THREE.MathUtils.lerp(-0.38, 0.35, s);
+                            pose.rightShoulderRot.set(THREE.MathUtils.lerp(-2.35, 0.95, s), 0, -0.15);
+                            pose.rightElbowRot.x = THREE.MathUtils.lerp(-0.35, -0.15, s);
+                            pose.rightHandRot.x = s * 0.55;
+                            pose.leftShoulderRot.set(THREE.MathUtils.lerp(-1.65, 0.65, s), 0, 0.35);
+                            pose.leftHipRot.x = -0.68 * s;
+                            pose.leftKneeRot.x = 1.15 * s;
+                            pose.rightHipRot.x = 0.45 * s;
+                            pose.rightKneeRot.x = 0.85 * s;
+                            pose.coreBoost = 2.5;
+                        } else {
+                            const r = 1.0 - THREE.MathUtils.smoothstep(normP, 0.62, 1.0);
+                            pose.pelvisPos.y = 2.15 - r * 0.50;
+                            pose.spineRot.x = r * 0.58;
+                            pose.chestRot.y = r * 0.35;
+                            pose.rightShoulderRot.set(THREE.MathUtils.lerp(0.15, 0.95, r), 0, -0.15);
+                            pose.rightHandRot.x = r * 0.55;
+                            pose.leftHipRot.x = -0.68 * r;
+                            pose.leftKneeRot.x = 1.15 * r;
+                            pose.rightHipRot.x = 0.45 * r;
+                            pose.rightKneeRot.x = 0.85 * r;
+                        }
+                        break;
+                    }
+
+                    case 'Sweep': {
+                        // 大范围水平回旋横扫
+                        if (normP < 0.35) {
+                            const w = THREE.MathUtils.smoothstep(normP, 0, 0.35);
+                            pose.pelvisRot.y = -w * 0.45;
+                            pose.chestRot.y = -w * 0.65;
+                            pose.rightShoulderRot.set(-0.35, -w * 0.85, -1.15 * w);
+                            pose.rightElbowRot.x = -0.25;
+                            pose.leftShoulderRot.set(-0.4, 0, 0.45);
+                        } else if (normP < 0.72) {
+                            const s = THREE.MathUtils.smoothstep(normP, 0.35, 0.72);
+                            pose.pelvisPos.y = 2.02;
+                            pose.pelvisRot.y = THREE.MathUtils.lerp(-0.45, 0.65, s);
+                            pose.chestRot.y = THREE.MathUtils.lerp(-0.65, 0.85, s);
+                            pose.rightShoulderRot.set(-0.65, THREE.MathUtils.lerp(-0.85, 1.25, s), -1.1);
+                            pose.rightElbowRot.x = -0.15;
+                            pose.leftHipRot.x = -0.35;
+                            pose.leftKneeRot.x = 0.65;
+                            pose.coreBoost = 2.0;
+                        } else {
+                            const r = 1.0 - THREE.MathUtils.smoothstep(normP, 0.72, 1.0);
+                            pose.pelvisRot.y = r * 0.65;
+                            pose.chestRot.y = r * 0.85;
+                            pose.rightShoulderRot.set(-0.65 * r, r * 1.25, -1.1 * r);
+                        }
+                        break;
+                    }
+
+                    case 'Throw': {
+                        // 战锤回旋投掷并飞回手掌
+                        if (normP < 0.32) {
+                            const w = THREE.MathUtils.smoothstep(normP, 0, 0.32);
+                            pose.chestRot.y = -w * 0.75;
+                            pose.rightShoulderRot.set(-w * 1.6, -w * 0.5, -0.35);
+                            pose.rightElbowRot.x = -0.85;
+                        } else if (normP < 0.82) {
+                            const f = (normP - 0.32) / 0.50;
+                            const throwArc = Math.sin(f * Math.PI);
+                            pose.chestRot.y = 0.65 * (1 - f * 0.4);
+                            pose.spineRot.x = 0.25 * throwArc;
+                            pose.rightShoulderRot.set(-1.1, 0.45, -0.2);
+                            pose.rightElbowRot.x = -0.15;
+                            pose.rightFingerCurl = 0.1; // 张开五指释放战锤
+                            // 战锤向前高速旋转飞出再回旋飞回
+                            pose.hammerPosOffset.set(0, 0, throwArc * 6.2);
+                            pose.hammerRotOffset.set(f * Math.PI * 6, 0, 0);
+                            pose.coreBoost = 2.2;
+                        } else {
+                            const c = 1.0 - THREE.MathUtils.smoothstep(normP, 0.82, 1.0);
+                            pose.chestRot.y = c * 0.35;
+                            pose.rightShoulderRot.set(-1.1 * c, 0.45 * c, -0.2);
+                        }
+                        break;
+                    }
+
+                    case 'Hit': {
+                        const h = Math.sin(normP * Math.PI);
+                        pose.pelvisPos.z = -h * 0.32;
+                        pose.spineRot.x = -h * 0.42;
+                        pose.chestRot.x = -h * 0.32;
+                        pose.chestRot.y = h * 0.28;
+                        pose.headRot.x = -h * 0.55;
+                        pose.jawRotX = h * 0.42;
+                        pose.leftShoulderRot.set(h * 0.5, 0, 0.65 * h);
+                        pose.rightShoulderRot.set(h * 0.5, 0, -0.65 * h);
+                        break;
+                    }
+
+                    case 'Stun': {
+                        const d = normP * tau;
+                        pose.pelvisPos.y = 2.04;
+                        pose.pelvisRot.z = Math.sin(d) * 0.12;
+                        pose.spineRot.x = 0.22 + Math.cos(d) * 0.18;
+                        pose.spineRot.z = Math.sin(d) * 0.22;
+                        pose.headRot.z = Math.cos(d * 2) * 0.32;
+                        pose.headRot.x = 0.25 + Math.sin(d * 2) * 0.22;
+                        pose.jawRotX = 0.32;
+                        pose.leftShoulderRot.set(0.25, 0, 0.28 + Math.sin(d) * 0.15);
+                        pose.rightShoulderRot.set(0.32, 0, -0.28 + Math.cos(d) * 0.15);
+                        pose.leftKneeRot.x = 0.35;
+                        pose.rightKneeRot.x = 0.35;
+                        pose.coreBoost = 0.45 + Math.abs(Math.sin(t * 8)) * 0.4;
+                        break;
+                    }
+
+                    case 'Taunt': {
+                        const pound = Math.sin(normP * Math.PI * 6);
+                        const env = Math.sin(normP * Math.PI);
+                        pose.spineRot.x = -0.15 * env;
+                        pose.chestRot.y = pound * 0.12 * env;
+                        pose.headRot.x = -0.18 * env;
+                        pose.jawRotX = 0.28 * env;
+                        // 左拳捶击胸前锅炉
+                        pose.leftShoulderRot.set(-1.15 * env, 0.55 * env + pound * 0.22, 0.2);
+                        pose.leftElbowRot.x = -1.45 * env - pound * 0.3;
+                        pose.leftFingerCurl = 0.95;
+                        // 右手高举战锤示威
+                        pose.rightShoulderRot.set(-1.85 * env, 0, -0.35);
+                        pose.rightElbowRot.x = -0.45 + pound * 0.25;
+                        pose.coreBoost = 1.65;
+                        break;
+                    }
+
+                    case 'Roar': {
+                        const env = Math.sin(normP * Math.PI);
+                        const vib = Math.sin(t * 32) * 0.035 * env;
+                        pose.pelvisPos.y = 2.15 - env * 0.18;
+                        pose.spineRot.x = -0.32 * env;
+                        pose.chestRot.x = -0.28 * env + vib;
+                        pose.headRot.x = -0.45 * env + vib;
+                        pose.jawRotX = 0.68 * env; // 下颚大张咆哮
+                        pose.leftShoulderRot.set(0.35 * env, 0, 0.85 * env);
+                        pose.leftElbowRot.x = -0.65 * env;
+                        pose.leftFingerCurl = 0.05;
+                        pose.rightShoulderRot.set(0.35 * env, 0, -0.85 * env);
+                        pose.rightElbowRot.x = -0.65 * env;
+                        pose.leftHipRot.x = -0.28 * env;
+                        pose.leftKneeRot.x = 0.52 * env;
+                        pose.rightHipRot.x = -0.28 * env;
+                        pose.rightKneeRot.x = 0.52 * env;
+                        pose.coreBoost = 2.8;
+                        break;
+                    }
+
+                    case 'Cast': {
+                        const env = Math.sin(normP * Math.PI);
+                        const hover = Math.sin(normP * Math.PI * 4) * 0.08;
+                        pose.pelvisPos.y = 2.15 + env * 0.42 + hover;
+                        pose.spineRot.x = -0.24 * env;
+                        pose.headRot.x = -0.35 * env;
+                        pose.jawRotX = 0.35 * env;
+                        pose.leftShoulderRot.set(-2.15 * env, 0, 0.45 * env);
+                        pose.leftElbowRot.x = -0.25;
+                        pose.leftFingerCurl = 0.0;
+                        pose.rightShoulderRot.set(-2.15 * env, 0, -0.45 * env);
+                        pose.rightElbowRot.x = -0.25;
+                        pose.leftHipRot.x = 0.25 * env;
+                        pose.leftKneeRot.x = 0.45 * env;
+                        pose.rightHipRot.x = 0.35 * env;
+                        pose.rightKneeRot.x = 0.65 * env;
+                        pose.coreBoost = 3.2;
+                        break;
+                    }
+
+                    case 'Death': {
+                        // 0-0.45 双膝跪地，0.45-0.85 向前扑倒，0.85-1.0 短暂静止后准备平滑恢复待机
+                        const k = THREE.MathUtils.smoothstep(normP, 0, 0.42);
+                        const fall = THREE.MathUtils.smoothstep(normP, 0.42, 0.82);
+
+                        pose.pelvisPos.y = 2.15 - k * 0.95 - fall * 0.72;
+                        pose.pelvisPos.z = fall * 0.65;
+                        pose.pelvisRot.x = k * 0.25 + fall * 1.18;
+                        pose.spineRot.x = k * 0.35 - fall * 0.25;
+                        pose.headRot.x = k * 0.45 - fall * 0.55;
+                        pose.jawRotX = 0.38 * (1 - fall * 0.5);
+
+                        pose.leftHipRot.x = -k * 1.15 + fall * 0.85;
+                        pose.leftKneeRot.x = k * 2.05 - fall * 1.65;
+                        pose.rightHipRot.x = -k * 1.15 + fall * 0.85;
+                        pose.rightKneeRot.x = k * 2.05 - fall * 1.65;
+
+                        pose.leftShoulderRot.set(-fall * 1.15, 0, 0.55);
+                        pose.rightShoulderRot.set(-fall * 1.15, 0, -0.55);
+                        pose.coreBoost = Math.max(0.15, 1.0 - normP * 0.9);
+                        break;
+                    }
+                }
+
+                return pose;
+            }
+
+            /**
+             * 每帧更新骨骼动画、独眼微动（Saccades）与能量核心闪烁
+             */
+            update(dt, animSpeed) {
+                const scaledDt = dt * animSpeed;
+                this.m_TotalTime += scaledDt;
+                this.m_StateTime += scaledDt;
+
+                const stateObj = this.publicStateCatalog.find((s) => s.id === this.publicCurrentState) || this.publicStateCatalog[0];
+                let normP = this.m_StateTime / stateObj.duration;
+
+                if (stateObj.loop) {
+                    normP = normP % 1.0;
+                } else if (normP >= 1.0) {
+                    // 非循环动作结束后自动平滑切换到下一动作或待机 (Idle)
+                    const nextState = stateObj.nextState || 'Idle';
+                    this.setAnimationState(nextState);
+                    normP = 0;
+                }
+                this.publicAnimProgress = Math.min(1.0, Math.max(0.0, normP));
+
+                const target = this.m_ComputeTargetPose(this.publicCurrentState, this.m_TotalTime, this.publicAnimProgress);
+                const joints = this.m_Character.publicJoints;
+                const blend = Math.min(1.0, dt * 12.0 * Math.max(0.6, animSpeed));
+
+                // 平滑插值骨骼关节
+                joints.pelvis.position.lerp(target.pelvisPos, blend);
+                this.m_LerpEuler(joints.pelvis.rotation, target.pelvisRot, blend);
+                this.m_LerpEuler(joints.spine.rotation, target.spineRot, blend);
+                this.m_LerpEuler(joints.chest.rotation, target.chestRot, blend);
+                this.m_LerpEuler(joints.neck.rotation, target.neckRot, blend);
+                this.m_LerpEuler(joints.head.rotation, target.headRot, blend);
+                joints.jaw.rotation.x = THREE.MathUtils.lerp(joints.jaw.rotation.x, target.jawRotX, blend);
+
+                this.m_LerpEuler(joints.leftShoulder.rotation, target.leftShoulderRot, blend);
+                this.m_LerpEuler(joints.leftElbow.rotation, target.leftElbowRot, blend);
+                this.m_LerpEuler(joints.leftHand.rotation, target.leftHandRot, blend);
+
+                this.m_LerpEuler(joints.rightShoulder.rotation, target.rightShoulderRot, blend);
+                this.m_LerpEuler(joints.rightElbow.rotation, target.rightElbowRot, blend);
+                this.m_LerpEuler(joints.rightHand.rotation, target.rightHandRot, blend);
+
+                this.m_LerpEuler(joints.leftHip.rotation, target.leftHipRot, blend);
+                this.m_LerpEuler(joints.leftKnee.rotation, target.leftKneeRot, blend);
+                this.m_LerpEuler(joints.leftAnkle.rotation, target.leftAnkleRot, blend);
+
+                this.m_LerpEuler(joints.rightHip.rotation, target.rightHipRot, blend);
+                this.m_LerpEuler(joints.rightKnee.rotation, target.rightKneeRot, blend);
+                this.m_LerpEuler(joints.rightAnkle.rotation, target.rightAnkleRot, blend);
+
+                // 五指分段弯曲控制
+                this.m_ApplyFingerCurl(joints.leftFingers, target.leftFingerCurl, 1, blend);
+                this.m_ApplyFingerCurl(joints.rightFingers, target.rightFingerCurl, -1, blend);
+
+                // 战锤投掷位移与旋转
+                const hammerRest = this.m_Character.getRestPose('hammer');
+                if (hammerRest) {
+                    const desiredHammerPos = hammerRest.pos.clone().add(target.hammerPosOffset);
+                    joints.hammer.position.lerp(desiredHammerPos, blend);
+                    joints.hammer.rotation.x = THREE.MathUtils.lerp(joints.hammer.rotation.x, target.hammerRotOffset.x, blend);
+                }
+
+                // 独眼眼球微动 (Eyeball Saccades)
+                this.m_SaccadeTimer -= dt;
+                if (this.m_SaccadeTimer <= 0) {
+                    this.m_SaccadeTimer = 0.35 + Math.random() * 1.4;
+                    this.m_TargetEyeYaw = (Math.random() - 0.5) * 0.42;
+                    this.m_TargetEyePitch = (Math.random() - 0.5) * 0.28;
+                }
+                if (this.publicCurrentState === 'Stun') {
+                    this.m_TargetEyeYaw = Math.cos(this.m_TotalTime * 7) * 0.45;
+                    this.m_TargetEyePitch = Math.sin(this.m_TotalTime * 7) * 0.35;
+                }
+                this.m_CurrentEyeYaw = THREE.MathUtils.lerp(this.m_CurrentEyeYaw, this.m_TargetEyeYaw, Math.min(1, dt * 18));
+                this.m_CurrentEyePitch = THREE.MathUtils.lerp(this.m_CurrentEyePitch, this.m_TargetEyePitch, Math.min(1, dt * 18));
+                if (joints.eyeBall) {
+                    joints.eyeBall.rotation.y = this.m_CurrentEyeYaw;
+                    joints.eyeBall.rotation.x = this.m_CurrentEyePitch;
+                }
+
+                // 独眼脉动发光 + 胸口能量核心与锤头核心闪烁
+                const flicker = 0.88 + 0.12 * Math.sin(this.m_TotalTime * 19.0) + 0.08 * Math.cos(this.m_TotalTime * 37.0);
+                const eyePulse = (1.35 + 0.45 * Math.sin(this.m_TotalTime * 3.8)) * target.coreBoost;
+                this.m_Materials.amberEye.emissiveIntensity = eyePulse;
+                this.m_Materials.boilerCore.emissiveIntensity = 2.8 * flicker * target.coreBoost;
+                this.m_Materials.hammerCore.emissiveIntensity = 3.1 * flicker * target.coreBoost;
+
+                if (joints.boilerCore) {
+                    joints.boilerCore.rotation.y += scaledDt * 1.8;
+                    joints.boilerCore.rotation.z += scaledDt * 1.1;
+                }
+
+                return {
+                    eyeIntensity: eyePulse,
+                    coreIntensity: 2.8 * flicker * target.coreBoost
+                };
+            }
+
+            m_LerpEuler(eulerA, eulerB, alpha) {
+                eulerA.x = THREE.MathUtils.lerp(eulerA.x, eulerB.x, alpha);
+                eulerA.y = THREE.MathUtils.lerp(eulerA.y, eulerB.y, alpha);
+                eulerA.z = THREE.MathUtils.lerp(eulerA.z, eulerB.z, alpha);
+            }
+
+            m_ApplyFingerCurl(fingerList, curlAmount, dirSign, alpha) {
+                if (!fingerList) return;
+                for (let i = 0; i < fingerList.length; i++) {
+                    const f = fingerList[i];
+                    const targetAngle = dirSign * curlAmount * 1.25;
+                    f.root.rotation.z = THREE.MathUtils.lerp(f.root.rotation.z, targetAngle, alpha);
+                    f.distal.rotation.z = THREE.MathUtils.lerp(f.distal.rotation.z, targetAngle * 1.1, alpha);
+                }
+            }
+        }
+
+        // ============================================================================
+        // 4. 主应用引擎 (SteampunkCyclopsApp)
+        //    负责：WebGL 渲染器、PMREM 程序化环境贴图、工作室电影灯光、工业齿轮地面、
+        //          双烟囱蒸汽粒子系统、lil-gui 面板与主循环
+        // ============================================================================
+        class SteampunkCyclopsApp {
+            constructor() {
+                // 公共配置参数 (遵循小驼峰命名规范)
+                this.publicConfig = {
+                    explodeAmount: 0.0,
+                    explodeAxis: 'Radial',
+                    animationState: 'Idle',
+                    animationSpeed: 1.0,
+                    gearSpeed: 1.0,
+                    wireframe: false,
+                    showSkeleton: false,
+                    autoRotate: false
+                };
+
+                // 私有核心成员 (遵循 m_ + 大驼峰命名规范)
+                this.m_Container = document.getElementById('canvasContainer');
+                this.m_Scene = null;
+                this.m_Cam = null;
+                this.m_Renderer = null;
+                this.m_Controls = null;
+                this.m_Clock = new THREE.Clock();
+                this.m_TextureFactory = null;
+                this.m_Character = null;
+                this.m_AnimController = null;
+                this.m_Gui = null;
+                this.m_EyePointLight = null;
+                this.m_BoilerPointLight = null;
+                this.m_HammerPointLight = null;
+                this.m_SteamParticles = [];
+                this.m_FloorGears = [];
+                this.m_FrameCount = 0;
+                this.m_FpsAccumulator = 0;
+
+                this.m_InitEngine();
+                this.m_SetupEnvironmentAndLights();
+                this.m_BuildIndustrialStageFloor();
+                this.m_InitCharacterAndAnimation();
+                this.m_InitSteamParticleSystem();
+                this.m_InitGuiAndHud();
+                this.m_BindEvents();
+                this.m_AnimateLoop();
+            }
+
+            /**
+             * 初始化 WebGLRenderer、Scene、Camera 与 OrbitControls
+             */
+            m_InitEngine() {
+                this.m_Scene = new THREE.Scene();
+                this.m_Scene.background = new THREE.Color(0x0c0e13);
+                this.m_Scene.fog = new THREE.FogExp2(0x0c0e13, 0.032);
+
+                this.m_Cam = new THREE.PerspectiveCamera(
+                    42,
+                    window.innerWidth / window.innerHeight,
+                    0.1,
+                    120
+                );
+                this.m_Cam.position.set(0.4, 3.3, 8.2);
+
+                this.m_Renderer = new THREE.WebGLRenderer({
+                    antialias: true,
+                    powerPreference: 'high-performance'
+                });
+                this.m_Renderer.setSize(window.innerWidth, window.innerHeight);
+                this.m_Renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+                this.m_Renderer.toneMapping = THREE.ACESFilmicToneMapping;
+                this.m_Renderer.toneMappingExposure = 1.18;
+                this.m_Renderer.shadowMap.enabled = true;
+                this.m_Renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+                this.m_Container.appendChild(this.m_Renderer.domElement);
+
+                this.m_Controls = new OrbitControls(this.m_Cam, this.m_Renderer.domElement);
+                this.m_Controls.target.set(0, 2.35, 0);
+                this.m_Controls.enableDamping = true;
+                this.m_Controls.dampingFactor = 0.06;
+                this.m_Controls.minDistance = 2.6;
+                this.m_Controls.maxDistance = 22.0;
+                this.m_Controls.maxPolarAngle = Math.PI * 0.495;
+            }
+
+            /**
+             * 生成 PMREM 程序化工作室环境贴图与电影级灯光系统
+             */
+            m_SetupEnvironmentAndLights() {
+                const pmremGenerator = new THREE.PMREMGenerator(this.m_Renderer);
+                pmremGenerator.compileEquirectangularShader();
+
+                const envScene = new THREE.Scene();
+                envScene.background = new THREE.Color(0x141820);
+
+                // 顶部暖琥珀天光灯箱
+                const topLightPanel = new THREE.Mesh(
+                    new THREE.PlaneGeometry(18, 18),
+                    new THREE.MeshBasicMaterial({ color: 0xffd296, side: THREE.DoubleSide })
+                );
+                topLightPanel.position.set(0, 12, 0);
+                topLightPanel.rotation.x = Math.PI * 0.5;
+                envScene.add(topLightPanel);
+
+                // 侧面青蓝冷光反射板
+                const sidePanel = new THREE.Mesh(
+                    new THREE.PlaneGeometry(14, 10),
+                    new THREE.MeshBasicMaterial({ color: 0x38bdf8, side: THREE.DoubleSide })
+                );
+                sidePanel.position.set(-12, 4, -4);
+                sidePanel.lookAt(0, 2, 0);
+                envScene.add(sidePanel);
+
+                // 地面暖炉反光板
+                const warmBounce = new THREE.Mesh(
+                    new THREE.PlaneGeometry(16, 16),
+                    new THREE.MeshBasicMaterial({ color: 0xb45309, side: THREE.DoubleSide })
+                );
+                warmBounce.position.set(8, -6, 6);
+                warmBounce.lookAt(0, 2, 0);
+                envScene.add(warmBounce);
+
+                const envRT = pmremGenerator.fromScene(envScene, 0.04);
+                this.m_Scene.environment = envRT.texture;
+                pmremGenerator.dispose();
+
+                // 1. 半球环境光
+                const hemiLight = new THREE.HemisphereLight(0xffe4b5, 0x1e293b, 0.55);
+                this.m_Scene.add(hemiLight);
+
+                // 2. 电影级主光源 (Key Light - 暖金蒸汽工坊投光)
+                const keyLight = new THREE.DirectionalLight(0xfff1d6, 3.2);
+                keyLight.position.set(5.5, 9.5, 6.5);
+                keyLight.castShadow = true;
+                keyLight.shadow.mapSize.set(2048, 2048);
+                keyLight.shadow.camera.near = 1.0;
+                keyLight.shadow.camera.far = 25.0;
+                const d = 5.5;
+                keyLight.shadow.camera.left = -d;
+                keyLight.shadow.camera.right = d;
+                keyLight.shadow.camera.top = d;
+                keyLight.shadow.camera.bottom = -d;
+                keyLight.shadow.bias = -0.0005;
+                this.m_Scene.add(keyLight);
+
+                // 3. 补光 (Fill Light - 柔和钢蓝补光)
+                const fillLight = new THREE.DirectionalLight(0x60a5fa, 1.25);
+                fillLight.position.set(-6.5, 4.5, 3.5);
+                this.m_Scene.add(fillLight);
+
+                // 4. 轮廓光 (Rim Light - 背部强青色机械轮廓光)
+                const rimLight = new THREE.SpotLight(0x38bdf8, 38.0, 22, Math.PI * 0.35, 0.6, 1.5);
+                rimLight.position.set(-2.5, 7.2, -6.8);
+                rimLight.target.position.set(0, 2.5, 0);
+                this.m_Scene.add(rimLight);
+                this.m_Scene.add(rimLight.target);
+            }
+
+            /**
+             * 构建工业蒸汽朋克齿轮舞台地面
+             */
+            m_BuildIndustrialStageFloor() {
+                this.m_TextureFactory = new ProceduralTextureFactory();
+                const mat = this.m_TextureFactory.publicMaterials;
+
+                const stageGroup = new THREE.Group();
+                this.m_Scene.add(stageGroup);
+
+                // 底层深色岩石地面
+                const groundPlane = new THREE.Mesh(
+                    new THREE.CircleGeometry(28, 64),
+                    new THREE.MeshStandardMaterial({
+                        color: 0x12151c,
+                        roughness: 0.85,
+                        metalness: 0.25
+                    })
+                );
+                groundPlane.rotation.x = -Math.PI * 0.5;
+                groundPlane.position.y = -0.02;
+                groundPlane.receiveShadow = true;
+                stageGroup.add(groundPlane);
+
+                // 中央黄铜与锈蚀铁装甲圆台
+                const platformRing = new THREE.Mesh(
+                    new THREE.CylinderGeometry(3.8, 4.1, 0.14, 36),
+                    mat.rustedIron
+                );
+                platformRing.position.y = -0.05;
+                platformRing.receiveShadow = true;
+                stageGroup.add(platformRing);
+
+                const brassRim = new THREE.Mesh(
+                    new THREE.TorusGeometry(3.82, 0.09, 12, 48),
+                    mat.brass
+                );
+                brassRim.rotation.x = Math.PI * 0.5;
+                brassRim.position.y = 0.01;
+                brassRim.receiveShadow = true;
+                stageGroup.add(brassRim);
+            }
+
+            /**
+             * 初始化独眼巨人角色、绑定点光源与动作状态机
+             */
+            m_InitCharacterAndAnimation() {
+                const mat = this.m_TextureFactory.publicMaterials;
+                this.m_Character = new SteampunkCyclopsCharacter(mat);
+                this.m_Scene.add(this.m_Character.publicRoot);
+
+                // 在地面镶嵌几个缓慢转动的巨型工业齿轮
+                const floorGearConfigs = [
+                    { x: -1.8, z: -1.4, r: 1.35, t: 18, spd: 0.25, mat: mat.brass },
+                    { x: 1.7,  z: -1.2, r: 1.15, t: 15, spd: -0.32, mat: mat.copper },
+                    { x: 0.2,  z: 1.6,  r: 0.95, t: 12, spd: 0.4,  mat: mat.bluedSteel }
+                ];
+                floorGearConfigs.forEach((cfg) => {
+                    const fg = this.m_Character.m_CreateGearMesh(cfg.r, cfg.r * 0.35, 0.08, cfg.t, cfg.mat);
+                    fg.rotation.x = Math.PI * 0.5;
+                    fg.position.set(cfg.x, 0.01, cfg.z);
+                    fg.receiveShadow = true;
+                    this.m_Scene.add(fg);
+                    this.m_FloorGears.push({ mesh: fg, spd: cfg.spd });
+                });
+
+                // 眼部点光源、胸腔锅炉点光源与巨锤核心点光源
+                this.m_EyePointLight = new THREE.PointLight(0xffaa00, 3.2, 4.5, 1.6);
+                this.m_EyePointLight.position.set(0, 0, 0.32);
+                this.m_Character.publicJoints.eyeBall.add(this.m_EyePointLight);
+
+                this.m_BoilerPointLight = new THREE.PointLight(0xff6b00, 4.5, 5.5, 1.5);
+                this.m_BoilerPointLight.position.set(0, 0, 0.38);
+                this.m_Character.publicJoints.boilerCore.add(this.m_BoilerPointLight);
+
+                this.m_HammerPointLight = new THREE.PointLight(0xff8800, 3.5, 4.2, 1.6);
+                this.m_HammerPointLight.position.set(0, 0, 0);
+                this.m_Character.publicJoints.hammerCore.add(this.m_HammerPointLight);
+
+                // 初始化动作状态机
+                this.m_AnimController = new CyclopsAnimationController(
+                    this.m_Character,
+                    mat,
+                    (newStateObj) => {
+                        this.publicConfig.animationState = newStateObj.id;
+                        this.m_SyncHudStateUI(newStateObj);
+                    }
+                );
+            }
+
+            /**
+             * 初始化背部双烟囱的程序化蒸汽粒子系统
+             */
+            m_InitSteamParticleSystem() {
+                const puffGeo = new THREE.DodecahedronGeometry(0.11, 1);
+                const puffCount = 32;
+
+                for (let i = 0; i < puffCount; i++) {
+                    const puffMat = new THREE.MeshStandardMaterial({
+                        color: 0xd6d3d1,
+                        roughness: 0.95,
+                        metalness: 0.0,
+                        transparent: true,
+                        opacity: 0.0,
+                        depthWrite: false
+                    });
+                    const mesh = new THREE.Mesh(puffGeo, puffMat);
+                    this.m_Scene.add(mesh);
+
+                    this.m_SteamParticles.push({
+                        mesh,
+                        age: Math.random() * 1.8,
+                        maxAge: 1.4 + Math.random() * 0.8,
+                        chimneyIndex: i % 2,
+                        vel: new THREE.Vector3(
+                            (Math.random() - 0.5) * 0.35,
+                            0.95 + Math.random() * 0.55,
+                            -0.25 + (Math.random() - 0.5) * 0.35
+                        )
+                    });
+                }
+            }
+
+            /**
+             * 更新双烟囱蒸汽粒子
+             */
+            m_UpdateSteamParticles(dt, gearSpeed) {
+                const tips = this.m_Character.publicChimneyTips;
+                if (!tips || tips.length < 2) return;
+
+                const spawnWorld = new THREE.Vector3();
+                for (let i = 0; i < this.m_SteamParticles.length; i++) {
+                    const p = this.m_SteamParticles[i];
+                    p.age += dt * (0.7 + gearSpeed * 0.35);
+
+                    if (p.age >= p.maxAge) {
+                        p.age = 0;
+                        tips[p.chimneyIndex].getWorldPosition(spawnWorld);
+                        p.mesh.position.copy(spawnWorld);
+                        p.mesh.scale.setScalar(0.55);
+                    } else {
+                        const lifeRatio = p.age / p.maxAge;
+                        p.mesh.position.addScaledVector(p.vel, dt);
+                        p.mesh.scale.setScalar(0.55 + lifeRatio * 2.1);
+                        p.mesh.rotation.x += dt * 1.2;
+                        p.mesh.rotation.y += dt * 0.9;
+                        const alpha = Math.sin(lifeRatio * Math.PI) * 0.36;
+                        p.mesh.material.opacity = alpha;
+                    }
+                }
+            }
+
+            /**
+             * 初始化 lil-gui 控制面板与底部快捷动作按钮
+             */
+            m_InitGuiAndHud() {
+                this.m_Gui = new GUI({ title: '⚙️ 蒸汽独眼巨人控制台', width: 310 });
+
+                // 1. 爆炸拆解视图分组
+                const explodeFolder = this.m_Gui.addFolder('💥 爆炸拆解视图 (Exploded View)');
+                explodeFolder
+                    .add(this.publicConfig, 'explodeAmount', 0.0, 1.0, 0.005)
+                    .name('爆炸分离度 (0–1)');
+                explodeFolder
+                    .add(this.publicConfig, 'explodeAxis', {
+                        '径向分离 (Radial)': 'Radial',
+                        'X 轴分离 (X-Axis)': 'X',
+                        'Y 轴分离 (Y-Axis)': 'Y',
+                        'Z 轴分离 (Z-Axis)': 'Z'
+                    })
+                    .name('爆炸轴向 (Axis)');
+
+                // 2. 动作状态机与速率分组
+                const animFolder = this.m_Gui.addFolder('🎬 游戏动作套件 (14 States)');
+                const stateOptions = {};
+                this.m_AnimController.publicStateCatalog.forEach((item) => {
+                    stateOptions[item.label] = item.id;
+                });
+
+                this.m_GuiStateCtrl = animFolder
+                    .add(this.publicConfig, 'animationState', stateOptions)
+                    .name('动作状态 (State)')
+                    .listen()
+                    .onChange((val) => {
+                        this.m_AnimController.setAnimationState(val);
+                    });
+
+                animFolder
+                    .add(this.publicConfig, 'animationSpeed', 0.1, 5.0, 0.05)
+                    .name('动画速度 (0.1×–5×)');
+
+                animFolder
+                    .add(this.publicConfig, 'gearSpeed', 0.1, 5.0, 0.05)
+                    .name('齿轮转速 (0.1×–5×)');
+
+                // 3. 渲染与调试视图分组
+                const viewFolder = this.m_Gui.addFolder('🔍 渲染与骨骼调试 (Debug & View)');
+                viewFolder
+                    .add(this.publicConfig, 'wireframe')
+                    .name('线框模式 (Wireframe)')
+                    .onChange((val) => {
+                        Object.values(this.m_TextureFactory.publicMaterials).forEach((mat) => {
+                            if (mat && 'wireframe' in mat) {
+                                mat.wireframe = val;
+                            }
+                        });
+                    });
+
+                viewFolder
+                    .add(this.publicConfig, 'showSkeleton')
+                    .name('显示骨骼 (Skeleton)')
+                    .onChange((val) => {
+                        this.m_Character.publicSkeletonLines.visible = val;
+                    });
+
+                viewFolder
+                    .add(this.publicConfig, 'autoRotate')
+                    .name('自动旋转 (Auto Rotate)')
+                    .onChange((val) => {
+                        this.m_Controls.autoRotate = val;
+                        this.m_Controls.autoRotateSpeed = 1.6;
+                    });
+
+                // 构建底部 14 个快捷动作按钮
+                const btnContainer = document.getElementById('actionButtonContainer');
+                this.m_AnimController.publicStateCatalog.forEach((item) => {
+                    const btn = document.createElement('button');
+                    btn.dataset.stateId = item.id;
+                    btn.className = `action-btn px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap shrink-0 ${
+                        item.id === this.publicConfig.animationState ? 'active' : ''
+                    }`;
+                    btn.textContent = item.label.split(' ')[0];
+                    btn.addEventListener('click', () => {
+                        this.m_AnimController.setAnimationState(item.id);
+                    });
+                    btnContainer.appendChild(btn);
+                });
+            }
+
+            /**
+             * 同步 HUD 状态标签与按钮高亮
+             */
+            m_SyncHudStateUI(stateObj) {
+                const labelEl = document.getElementById('hudStateLabel');
+                if (labelEl && stateObj) {
+                    labelEl.textContent = stateObj.label;
+                }
+                const buttons = document.querySelectorAll('#actionButtonContainer .action-btn');
+                buttons.forEach((btn) => {
+                    if (btn.dataset.stateId === stateObj.id) {
+                        btn.classList.add('active');
+                    } else {
+                        btn.classList.remove('active');
+                    }
+                });
+            }
+
+            /**
+             * 绑定窗口自适应尺寸变化
+             */
+            m_BindEvents() {
+                window.addEventListener('resize', () => {
+                    this.m_Cam.aspect = window.innerWidth / window.innerHeight;
+                    this.m_Cam.updateProjectionMatrix();
+                    this.m_Renderer.setSize(window.innerWidth, window.innerHeight);
+                });
+            }
+
+            /**
+             * 基于 delta-time 的平滑主渲染循环
+             */
+            m_AnimateLoop() {
+                requestAnimationFrame(() => this.m_AnimateLoop());
+
+                const rawDt = this.m_Clock.getDelta();
+                const dt = Math.min(rawDt, 0.1);
+
+                // FPS 统计更新
+                this.m_FrameCount++;
+                this.m_FpsAccumulator += rawDt;
+                if (this.m_FpsAccumulator >= 0.4) {
+                    const fps = Math.round(this.m_FrameCount / this.m_FpsAccumulator);
+                    const fpsEl = document.getElementById('hudFps');
+                    if (fpsEl) fpsEl.textContent = String(fps);
+                    this.m_FrameCount = 0;
+                    this.m_FpsAccumulator = 0;
+                }
+
+                // 1. 更新骨骼动作状态机与核心发光脉冲
+                const lightPulse = this.m_AnimController.update(dt, this.publicConfig.animationSpeed);
+                this.m_EyePointLight.intensity = lightPulse.eyeIntensity * 2.2;
+                this.m_BoilerPointLight.intensity = lightPulse.coreIntensity * 1.6;
+                this.m_HammerPointLight.intensity = lightPulse.coreIntensity * 1.4;
+
+                // 更新 HUD 进度条
+                const progressEl = document.getElementById('hudAnimProgress');
+                if (progressEl) {
+                    progressEl.style.width = `${(this.m_AnimController.publicAnimProgress * 100).toFixed(1)}%`;
+                }
+
+                // 2. 更新角色齿轮、液压活塞、骨骼线与爆炸视图
+                this.m_Character.updateMechanicsAndExplode(
+                    dt,
+                    this.publicConfig.gearSpeed,
+                    this.publicConfig.explodeAmount,
+                    this.publicConfig.explodeAxis
+                );
+
+                // 3. 更新地面舞台齿轮与双烟囱蒸汽粒子
+                for (let i = 0; i < this.m_FloorGears.length; i++) {
+                    const fg = this.m_FloorGears[i];
+                    fg.mesh.rotation.z += dt * fg.spd * this.publicConfig.gearSpeed;
+                }
+                this.m_UpdateSteamParticles(dt, this.publicConfig.gearSpeed);
+
+                // 4. 更新轨道控制器与渲染场景
+                this.m_Controls.update();
+                this.m_Renderer.render(this.m_Scene, this.m_Cam);
+            }
+        }
+
+        // 启动应用
+        window.onload = function () {
+            window.cyclopsApp = new SteampunkCyclopsApp();
+        };
+    </script>
+</body>
+</html>

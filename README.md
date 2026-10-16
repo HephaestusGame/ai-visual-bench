@@ -63,6 +63,7 @@ GUI：
 |---|---|---|
 | Claude Opus 5.5 | 75 分钟 | [运行](https://hephaestusgame.github.io/ai-visual-bench/tests/steampunk-cyclops/claude-opus-5.5/) · [源码](tests/steampunk-cyclops/claude-opus-5.5/index.html) |
 | GPT 6 Astra | 32 分钟 | [运行](https://hephaestusgame.github.io/ai-visual-bench/tests/steampunk-cyclops/gpt-6-astra/) · [源码](tests/steampunk-cyclops/gpt-6-astra/index.html) |
+| Gemini 4 Argon | 6 分钟 | [运行](https://hephaestusgame.github.io/ai-visual-bench/tests/steampunk-cyclops/gemini-4-argon/) · [源码](tests/steampunk-cyclops/gemini-4-argon/index.html) |
 | GrokBot20261015 | 15 分钟 | [运行](https://hephaestusgame.github.io/ai-visual-bench/tests/steampunk-cyclops/grokbot-20261015/) · [源码](tests/steampunk-cyclops/grokbot-20261015/index.html) |
 
 ### 3. 蒸汽朋克九尾狐 / Steampunk Nine-Tailed Fox
