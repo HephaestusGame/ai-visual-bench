@@ -7,6 +7,17 @@
   "thumbnail_view": "正面略俯（仰角约 12°，方位约 -12°），巨人居中，完整展台",
   "items": [
     {
+      "model": "Claude Opus 5.5",
+      "slug": "claude-opus-5.5",
+      "duration_min": 75,
+      "duration": "75 分钟",
+      "file": "tests/steampunk-cyclops/claude-opus-5.5/index.html",
+      "thumbnail": "tests/steampunk-cyclops/claude-opus-5.5/thumb.png?v=0ed85d44",
+      "thumb_version": "0ed85d44",
+      "original_filename": "5a1c3173723583bef805d0204bc6be6fb350f2521cd7eb96921e5902250aac99.html",
+      "source": "Kako Chan 实测提交"
+    },
+    {
       "model": "GPT 6 Astra",
       "slug": "gpt-6-astra",
       "duration_min": 32,
