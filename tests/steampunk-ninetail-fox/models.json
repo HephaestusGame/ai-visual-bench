@@ -7,6 +7,17 @@
   "thumbnail_view": "正面略俯（仰角约 12°，方位约 -12°），九尾狐居中，完整展台",
   "items": [
     {
+      "model": "GPT 6 Astra",
+      "slug": "gpt-6-astra",
+      "duration_min": 26,
+      "duration": "26 分钟",
+      "file": "tests/steampunk-ninetail-fox/gpt-6-astra/index.html",
+      "thumbnail": "tests/steampunk-ninetail-fox/gpt-6-astra/thumb.png?v=c34e2049",
+      "thumb_version": "c34e2049",
+      "original_filename": "2799f115f04e22e1ee65784dff031baf7393d963addd44283392a46389891a69.html",
+      "source": "Kako Chan 实测提交"
+    },
+    {
       "model": "GrokBot20261016",
       "slug": "grokbot-20261016",
       "duration_min": 39,

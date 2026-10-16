@@ -96,6 +96,7 @@ GUI：
 
 | 模型 | 耗时 | 链接 |
 |---|---|---|
+| GPT 6 Astra | 26 分钟 | [运行](https://hephaestusgame.github.io/ai-visual-bench/tests/steampunk-ninetail-fox/gpt-6-astra/) · [源码](tests/steampunk-ninetail-fox/gpt-6-astra/index.html) |
 | GrokBot20261016 | 39 分钟 | [运行](https://hephaestusgame.github.io/ai-visual-bench/tests/steampunk-ninetail-fox/grokbot-20261016/) · [源码](tests/steampunk-ninetail-fox/grokbot-20261016/index.html) |
 
 ## 目录结构 / Layout
