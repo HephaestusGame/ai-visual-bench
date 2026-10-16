@@ -12,7 +12,7 @@ section{max-width:1200px;margin:auto;padding:16px 24px}.desc{color:#aaa;line-hei
 .body{padding:10px 12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}.name{font-weight:600;flex:1}
 .badge{background:#2d6cdf;color:#fff;border-radius:999px;padding:2px 10px;font-size:12px}.badge.na{background:#555}
 button{background:#333;color:#fff;border:0;border-radius:6px;padding:6px 12px;cursor:pointer}
-details.prompt{background:#1a1d24;border:1px solid #2a2f3a;border-radius:10px;padding:10px 14px;margin:0 0 16px}details.prompt summary{cursor:pointer;font-weight:600;display:flex;gap:12px;align-items:center}details.prompt pre{white-space:pre-wrap;font-size:13px;line-height:1.55;color:#cfd6e4;margin:10px 0 0}
+details.prompt{background:#1a1d24;border:1px solid #2a2f3a;border-radius:10px;padding:10px 14px;margin:0 0 16px}details.prompt summary{cursor:pointer;font-weight:600;display:flex;gap:12px;align-items:center}details.prompt summary{list-style:none}details.prompt summary::-webkit-details-marker{display:none}details.prompt .tg{color:#8ab4ff;user-select:none}details.prompt .tg-close{display:none}details.prompt[open] .tg-open{display:none}details.prompt[open] .tg-close{display:inline}details.prompt summary:hover .tg{text-decoration:underline}details.prompt pre{white-space:pre-wrap;font-size:13px;line-height:1.55;color:#cfd6e4;margin:10px 0 0}
 nav{max-width:1200px;margin:8px auto 0;padding:0 24px;display:flex;gap:10px;flex-wrap:wrap}nav a{background:#1a1d24;border:1px solid #2a2f3a;border-radius:999px;padding:4px 14px;text-decoration:none}nav a:hover{border-color:#7cc4ff}section{scroll-margin-top:12px}
 footer{max-width:1200px;margin:auto;padding:24px;color:#888;font-size:13px}
 </style></head><body>
@@ -28,7 +28,7 @@ function copyPrompt(btn,id){navigator.clipboard.writeText(document.getElementByI
 nav.innerHTML=idx.categories.map(c=>`<a href="#${c.id}">${esc(c.title)}</a>`).join('');
 for(const c of idx.categories){const t=c.id,m=await getJSON(`tests/${t}/models.json`);
 let h=`<section id="${t}"><h2>${esc(m.title)}</h2><p class="desc">${esc(m.description)}${m.source?`<br>来源：<a href="${m.source}" target="_blank" rel="noopener">${esc(m.source)}</a>`:''}</p>`;
-if(m.prompt)h+=`<details class="prompt" open><summary>提示词 / Prompt <button onclick="event.preventDefault();copyPrompt(this,'pt-${t}')">一键复制</button></summary><pre id="pt-${t}">${esc(m.prompt)}</pre></details>`;
+if(m.prompt)h+=`<details class="prompt"><summary><span class="tg"><span class="tg-open">▸ 展开提示词</span><span class="tg-close">▾ 收起提示词</span></span> <span>提示词 / Prompt</span> <button onclick="event.preventDefault();event.stopPropagation();copyPrompt(this,'pt-${t}')">一键复制</button></summary><pre id="pt-${t}">${esc(m.prompt)}</pre></details>`;
 h+='<div class="grid">';
 for(const it of m.items){const na=/未标注/.test(it.duration);
 h+=`<a class="card" href="${it.file}" target="_blank" rel="noopener" title="在新标签页打开 ${esc(it.model)}"><div class="cover"><img loading="lazy" src="${it.thumbnail}" alt="${esc(it.model)}"></div><div class="body"><span class="name">${esc(it.model)}</span><span class="badge ${na?'na':''}">⏱ ${esc(it.duration)}</span></div></a>`}
