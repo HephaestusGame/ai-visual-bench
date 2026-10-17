@@ -40,6 +40,17 @@
       "source": "Kako Chan 实测提交"
     },
     {
+      "model": "DeepSeek V4.1 Flash 1017",
+      "slug": "deepseek-v4.1-flash-1017",
+      "duration_min": 43,
+      "duration": "43 分钟",
+      "file": "tests/steampunk-cyclops/deepseek-v4.1-flash-1017/index.html",
+      "thumbnail": "tests/steampunk-cyclops/deepseek-v4.1-flash-1017/thumb.png?v=8a000683",
+      "thumb_version": "8a000683",
+      "original_filename": "f500a19992713754fec97d368876a3e3ddb4260fbd688ce4db3a164a8779b63f.html",
+      "source": "Kako Chan 实测提交"
+    },
+    {
       "model": "GrokBot20261015",
       "slug": "grokbot-20261015",
       "duration_min": 15,
